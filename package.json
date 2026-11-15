@@ -1,0 +1,20 @@
+{
+  "name": "captain-voyage",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Search for Our Long-Lost Captain: a live pirate icebreaker game (Node + MongoDB).",
+  "type": "module",
+  "engines": { "node": ">=20.6" },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --env-file=.env --watch server/index.js",
+    "local": "node --env-file=.env server/index.js",
+    "db:init": "node --env-file=.env scripts/db-init.js",
+    "loadtest": "node loadtest/simulate.js"
+  },
+  "dependencies": {
+    "@fastify/static": "^7.0.4",
+    "fastify": "^4.28.1",
+    "mongodb": "^6.9.0"
+  }
+}
