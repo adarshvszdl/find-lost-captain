@@ -825,7 +825,19 @@ function gameTorch(api, gid) {
   const ro = new ResizeObserver(resize); ro.observe(cv);
   let tx = START[0], ty = START[1], lx = tx, ly = ty, flick = 0, foundAt = 0, raf = 0, alive = true;
   const t0 = performance.now();
-  const msg = h("p", { class: "msg", style: "text-align:center", text: "Move your magical torch around the cave." });
+  const msg = h("p", { class: "msg", style: "text-align:center;min-height:2.9em", text: "Move your magical torch around the cave." });
+  // The CSS size is only a guess at the space left over; shrink the cave until the card no longer scrolls.
+  function fit() {
+    const sh = cv.closest(".sheet"); if (!sh || !alive) return;
+    cv.style.width = "";
+    const over = sh.scrollHeight - sh.clientHeight;
+    if (over > 1) cv.style.width = Math.max(240, (cv.getBoundingClientRect().height - over - 2) * W / H) + "px";
+  }
+  requestAnimationFrame(fit);
+  const fitLater = setTimeout(fit, 600);   // after the card's pop-in and the web fonts settle
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+  addEventListener("resize", fit);
+  cleanups.push(() => { clearTimeout(fitLater); removeEventListener("resize", fit); });
   const toLocal = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; };
   cv.addEventListener("pointermove", e => { [tx, ty] = toLocal(e); });
   cv.addEventListener("pointerdown", e => {
