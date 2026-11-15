@@ -10,7 +10,8 @@ const ROUNDS = [
     rules: ["Read the riddle and pick the right answer.", "Each wrong answer adds 10 seconds."],
     story: "Rolled up inside the scroll: pieces of the captain's portrait." },
   { key: "r2", type: "torch", title: "Shadow Cave Island",
-    rules: ["It's dark. Move your torch with the mouse, or drag a finger, to light the way.", "Find the hidden object and tap it once it's lit. Anything else is a decoy."],
+    rules: ["It's dark. Move your torch with the mouse, or drag a finger, to light the way.", "Find the captain's golden compass and tap it once it's lit. Shells and bones are decoys."],
+    target: "The captain's golden compass",
     story: "Under the compass, wrapped in oilcloth: more portrait pieces." },
   { key: "r3", type: "scramble", title: "Scramble Shores",
     rules: ["Tap the letters in the right order to unscramble the word.", "Each wrong word adds 5 seconds."],
@@ -23,6 +24,18 @@ const ROUNDS = [
     story: "" },
 ];
 const capFor = R => R.cap || CAP_MS;
+// What to look for, shown on the rules card. Drawn exactly like the compass hidden in the cave.
+function compassIcon() {
+  return s("svg", { viewBox: "-21 -23 42 44", class: "target-icon", "aria-hidden": "true" },
+    s("circle", { r: 15, fill: "#b8862a" }), s("circle", { r: 11, fill: "#f3e6c0" }),
+    s("path", { d: "M0 -10 L3 0 L-3 0 Z", fill: "#c0392b" }), s("path", { d: "M0 10 L3 0 L-3 0 Z", fill: "#2b1e10" }),
+    s("rect", { x: -3, y: -19, width: 6, height: 5, fill: "#e3b84c" }));
+}
+function targetCard(R) {
+  if (!R.target) return null;
+  return h("div", { class: "target-card" }, h("div", { class: "target-glow" }, compassIcon()),
+    h("div", null, h("div", { class: "sub", text: "You're looking for" }), h("div", { class: "target-name", text: R.target })));
+}
 const missFor = R => capFor(R) + 30000;
 const capText = R => { const s = capFor(R) / 1000, m = Math.floor(s / 60); return (m ? m + " min" : "") + (s % 60 ? (m ? " " : "") + s % 60 + " s" : ""); };
 const RIDDLE = { q: "I have a bed but never sleep. I run but never walk. I have a mouth but never talk. What am I?",

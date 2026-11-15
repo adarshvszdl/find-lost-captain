@@ -259,6 +259,7 @@ function renderRules(r) {
   const rules = [...R.rules, "You have " + capText(R) + ". Your clock starts when the challenge appears."];
   return screen(playerHud(piecesUpTo(earnedRows(r - 1))), grow(), dock(sheet(R.title, [
     h("div", { class: "sheet-head" }, h("div", { class: "sub", text: R.type === "puzzle" ? "Final challenge" : "Island " + (r + 1) + " of 4" }), h("div", { class: "sub", text: "Rules" })),
+    targetCard(R),
     h("ul", { class: "rules" }, rules.map(t => h("li", { text: t }))),
     h("div", { class: "intro-foot" }, liveChip("Get ready! The first mate will start the challenge.")),
   ], { color: "navy", enter: true })));
@@ -564,6 +565,7 @@ function hostStage(rows, enter, errP) {
     h("button", { class: "gbtn green big", disabled: hostBusy || n === 0, onclick: () => showRules(0) }, "Set sail for Riddle Reef"), errP], { enter })];
   if (G.phase === "rules") return [sheet(R.title, [
     h("div", { class: "sheet-head" }, h("div", { class: "sub", text: R.type === "puzzle" ? "Final challenge" : "Island " + (r + 1) + " of 4" }), liveChip("Rules on screen")),
+    targetCard(R),
     h("ul", { class: "rules" }, [...R.rules, "Time limit: " + capText(R) + "."].map(t => h("li", { text: t }))),
     R.type === "puzzle" ? h("p", { class: "strong", text: players.filter(holdsAllPieces).length + " of " + n + " pirates won every island and can assemble the portrait. The rest wait for the reveal." }) : null,
     h("p", { class: "muted small", text: "Players are reading these rules now. Start when the crew is ready; each player's clock starts when the challenge appears on their screen." }),

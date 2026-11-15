@@ -83,6 +83,11 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px 
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .sub { font-weight: 900; font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .rules { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; font-weight: 600; }
+.target-card { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 14px; background: #2c2924; color: var(--white); border: 3px solid var(--navy); }
+.target-card .sub { color: #cdbf9f; }
+.target-glow { flex: none; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle, rgba(255,214,120,.55), rgba(255,180,60,.12) 60%, transparent 72%); }
+.target-icon { width: 54px; height: 54px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
+.target-name { font-family: var(--f-display); font-size: 1.3rem; color: var(--sun); line-height: 1.1; }
 .intro-foot { display: flex; align-items: center; justify-content: center; gap: 14px; }
 .enter { animation: popIn .45s cubic-bezier(.2, 1.5, .4, 1) both; }
 @keyframes popIn { from { opacity: 0; transform: translateY(30px) scale(.94); } }
