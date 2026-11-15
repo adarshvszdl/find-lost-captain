@@ -847,7 +847,7 @@ function gameTorch(api, gid) {
     const t = now / 1000;
     lx += (tx - lx) * .22; ly += (ty - ly) * .22;
     flick = flick * .86 + (Math.random() - .5) * .07;
-    const f = 1 + .045 * Math.sin(t * 11.3) + .03 * Math.sin(t * 23.1 + 1.7) + flick, R = 200 * f;
+    const f = 1 + .045 * Math.sin(t * 11.3) + .03 * Math.sin(t * 23.1 + 1.7) + flick, R = 100 * f;
     const jx = Math.sin(t * 7.1) * 1.6, jy = Math.cos(t * 5.3) * 1.6, reveal = foundAt ? Math.min(1, (now - foundAt) / 900) : 0;
     dctx.setTransform(1, 0, 0, 1, 0, 0); dctx.globalCompositeOperation = "source-over"; dctx.clearRect(0, 0, dark.width, dark.height);
     dctx.fillStyle = "rgba(3,5,9," + (.985 * (1 - reveal)) + ")"; dctx.fillRect(0, 0, dark.width, dark.height);
