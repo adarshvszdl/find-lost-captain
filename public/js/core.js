@@ -1,25 +1,25 @@
 /* The Search for Our Long-Lost Captain — game content, world map and challenges. */
 /* ---------- Game content ---------- */
-const CAP_MS = 90000;      // a challenge auto-closes for a player after 90 s (the portrait has its own cap)
+const CAP_MS = 90000;      // default time limit; every round sets its own cap below (must match server/rounds.js)
 const IMG_URL = "captain.jpg";
 const GRID = 3;            // 3×3 portrait; islands 1–4 award 2, 3, 2 and 2 face-down pieces
 new Image().src = IMG_URL;
 
 const ROUNDS = [
-  { key: "r1", type: "riddle", title: "Riddle Reef",
+  { key: "r1", type: "riddle", title: "Riddle Reef", cap: 30000,
     rules: ["Read the riddle and pick the right answer.", "Each wrong answer adds 10 seconds."],
     story: "Rolled up inside the scroll: pieces of the captain's portrait." },
-  { key: "r2", type: "torch", title: "Shadow Cave Island",
+  { key: "r2", type: "torch", title: "Shadow Cave Island", cap: 60000,
     rules: ["It's dark. Move your torch with the mouse, or drag a finger, to light the way.", "Find the captain's golden compass and tap it once it's lit. Shells and bones are decoys."],
     target: "The captain's golden compass",
     story: "Under the compass, wrapped in oilcloth: more portrait pieces." },
-  { key: "r3", type: "scramble", title: "Scramble Shores",
+  { key: "r3", type: "scramble", title: "Scramble Shores", cap: 60000,
     rules: ["Tap the letters in the right order to unscramble the word.", "Each wrong word adds 5 seconds."],
     story: "The word was TREASURE, and the bottle held more portrait pieces." },
-  { key: "r4", type: "lock", title: "Lockdown Island",
+  { key: "r4", type: "lock", title: "Lockdown Island", cap: 90000,
     rules: ["Use the clues to work out the three-digit code.", "Each wrong code adds 10 seconds."],
     story: "Click! The chest swings open with the final portrait pieces inside." },
-  { key: "r5", type: "puzzle", title: "Captain's Cove", cap: 180000,
+  { key: "r5", type: "puzzle", title: "Captain's Cove", cap: 120000,
     rules: ["Drag the portrait pieces into the frame. A piece snaps in when it's close to its spot.", "Your clock stops when the last piece fits."],
     story: "" },
 ];

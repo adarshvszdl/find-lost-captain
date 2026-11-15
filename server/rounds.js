@@ -1,10 +1,10 @@
 // Must match ROUNDS in public/js/core.js (keys and time caps).
 export const ROUNDS = [
-  { key: "r1", cap: 90000 },   // Riddle Reef
-  { key: "r2", cap: 90000 },   // Shadow Cave Island
-  { key: "r3", cap: 90000 },   // Scramble Shores
+  { key: "r1", cap: 30000 },   // Riddle Reef
+  { key: "r2", cap: 60000 },   // Shadow Cave Island
+  { key: "r3", cap: 60000 },   // Scramble Shores
   { key: "r4", cap: 90000 },   // Lockdown Island
-  { key: "r5", cap: 180000 },  // Captain's Cove (portrait)
+  { key: "r5", cap: 120000 },  // Captain's Cove (portrait)
 ];
 export const missFor = R => R.cap + 30000;       // not finishing counts as cap + 30 s
 export const RESULT_GRACE_MS = 30000;            // results still accepted this long after the host ends a round
