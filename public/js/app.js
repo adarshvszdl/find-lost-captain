@@ -523,7 +523,7 @@ async function pollStage() {
     clockSkew = r.now - Math.round((t0 + Date.now()) / 2); stage = r; updateStage();
   } catch {}
 }
-function stageKey() { return !gameLoaded ? "s:loading" : !G ? "s:none" : ["s", G.gameId, G.phase, G.round, G.reveal || 0, !!G.published, !!G.captain].join(":"); }
+function stageKey() { return !gameLoaded ? "s:loading" : !G ? "s:none" : ["s", G.gameId, G.phase, G.round, !!G.published, !!G.captain].join(":"); }
 function stageBanner(kicker, title, sub) {
   return h("div", { class: "stage-banner" }, h("div", { class: "logo-kicker", text: kicker }), h("div", { class: "stage-title", text: title }), sub || null);
 }
@@ -554,9 +554,10 @@ function renderStage() {
   }
   // results: the podium follows the first mate's reveals; once the captain is revealed, the overlay is the whole screen
   if (G.captain) return screen();
-  const top = G.top || [], size = podiumSize(), shown = G.reveal || 0;
+  // The stage keeps the podium hidden until the first mate publishes; then it reveals 3rd, 2nd and 1st by itself.
+  const top = G.top || [], size = podiumSize(), shown = G.published ? size : 0, delay = { 3: ".3s", 2: "1.5s", 1: "2.7s" };
   const plinth = place => { const p = top[place - 1], vis = p && place > size - shown;
-    return h("div", { class: "plinth p" + place + (vis ? "" : " hidden") + (vis && place === size - shown + 1 ? " new" : "") },
+    return h("div", { class: "plinth p" + place + (vis ? " new" : " hidden"), style: vis ? "animation-delay:" + delay[place] : "" },
       h("div", { class: "place", text: ordinal(place) }), h("div", { class: "pn", text: vis ? p.name : p ? "?" : "—" }), h("div", { class: "pt", text: vis ? fmt(p.total) : "" })); };
   return screen(h("div", { class: "stage-results" }, sheet("Voyage complete!", [
     h("div", { class: "results-grid" }, portrait(G.gameId, ALL_ROWS, false), h("div", { class: "podium" }, plinth(2), plinth(1), plinth(3))),
