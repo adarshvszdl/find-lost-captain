@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -68,7 +69,25 @@ app.get("/api/host/players", async (req, reply) => { requireHost(req); reply.hea
 app.post("/api/host/action", async req => { requireHost(req); return game.hostAction(req.body || {}); });
 
 /* ---------- the game page ---------- */
+// The page links its scripts as js/x.js?v=<content hash>, so after any update browsers fetch
+// the new files instead of a cached copy. In dev mode the hash is recomputed on every load.
+const PUBLIC_DIR = path.join(__dirname, "..", "public");
+let pageCache = null;
+function pageHtml() {
+  if (pageCache && !DEV) return pageCache;
+  let html = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
+  html = html.replace(/(src|href)="(js\/[\w.-]+\.js|favicon\.svg)"/g, (m, attr, file) => {
+    const hash = crypto.createHash("sha1").update(fs.readFileSync(path.join(PUBLIC_DIR, file))).digest("hex").slice(0, 10);
+    return `${attr}="${file}?v=${hash}"`;
+  });
+  return (pageCache = html);
+}
+const sendPage = (req, reply) => reply.header("cache-control", "no-cache").type("text/html; charset=utf-8").send(pageHtml());
+app.get("/", sendPage);
+app.get("/index.html", sendPage);
+
 await app.register(fastifyStatic, {
+  index: false,
   root: path.join(__dirname, "..", "public"),
   // In dev mode (npm run dev) browsers re-check every file, so a normal refresh shows edits.
   setHeaders(res, file) { res.setHeader("cache-control", DEV || /\.(html)$/.test(file) ? "no-cache" : "public, max-age=3600"); },
