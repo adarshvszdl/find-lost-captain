@@ -72,17 +72,13 @@ function applyState(s) {
   G = s; gameLoaded = true; gameSlow = false;
   if (G && G.phase === "results" && joined()) { const k = G.gameId + ":" + G.resultsAt; if (rankFor !== k) { rankFor = k; refreshRank(); } }
 }
-function connectStream() {
-  let lastStream = 0, polling = false;
-  if (window.EventSource) {
-    const es = new EventSource("/api/stream");
-    es.addEventListener("state", e => { lastStream = Date.now(); try { applyState(JSON.parse(e.data)); } catch {} render(); });
-    es.addEventListener("ping", () => { lastStream = Date.now(); });
-  }
-  // Fallback for proxies that hold the stream back: while the stream has been silent for 20 s
-  // (it pings every 15 s when it works), fetch the state every 3 s so host clicks reach players quickly.
-  setInterval(async () => {
-    if (polling || Date.now() - lastStream < 20000) return;
+// Live updates by polling: fetch the public state now, then every 3 s (one request at a time).
+// The page used to open /api/stream too, but the deployed proxy holds that stream back, so it only
+// tied up a connection per player. The server endpoint is still there, unused by the page.
+function pollState() {
+  let polling = false;
+  const tick = async () => {
+    if (polling) return;
     polling = true;
     try {
       const s = await API.req("GET", "/api/state");
@@ -90,7 +86,9 @@ function connectStream() {
       if (changed) { applyState(s); render(); }   // re-render only when the state actually changed
     } catch {}
     polling = false;
-  }, 3000);
+  };
+  tick();
+  setInterval(tick, 3000);
 }
 async function pollPlayers() {
   if (!isHost) return;
@@ -115,7 +113,7 @@ async function boot() {
   addEventListener("hashchange", () => { updateHostMode(); viewAs = "auto"; currentKey = ""; if (isHost) pollPlayers(); if (wantsStage()) pollStage(); render(true); });
   setTimeout(() => { if (!gameLoaded) { gameSlow = true; currentKey = ""; render(); } }, 10000);
   await loadMe();
-  connectStream();
+  pollState();
   setInterval(() => { if (isHost) pollPlayers(); if (wantsStage()) pollStage(); }, 1500);
   if (isHost) pollPlayers();
   if (wantsStage()) pollStage();
