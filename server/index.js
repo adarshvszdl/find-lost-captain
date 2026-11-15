@@ -48,7 +48,7 @@ app.get("/api/stage", async (req, reply) => {
   reply.header("cache-control", "no-store");
   const g = cache.doc, list = g ? await cache.hostPlayers() : [];
   const R = g && ROUNDS[g.round], key = R && R.key;
-  const out = { now: Date.now(), aboard: list.length, recent: list.slice(-14).reverse().map(p => p.name || "Pirate") };
+  const out = { now: Date.now(), aboard: list.length };
   if (key && (g.phase === "round" || g.phase === "between")) {
     const done = list.filter(p => p.times[key] != null);
     out.finished = done.length;

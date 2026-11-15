@@ -49,7 +49,7 @@ npm run local               # starts on http://localhost:8080
 | --- | --- | --- | --- |
 | GET | `/healthz` | load balancer | 200 when the database is reachable |
 | GET | `/api/state` | anyone | current public game state |
-| GET | `/api/stage` | stage screen | crowd numbers: pirates aboard, latest names, finished count, fastest five |
+| GET | `/api/stage` | stage screen | crowd numbers: pirates aboard, finished count, fastest five |
 | GET | `/api/stream` | anyone | Server-Sent Events: `state` on every change, `ping` every 15 s |
 | POST | `/api/join` | player | `{ name, playerId?, token? }` returns `{ playerId, token, player }` |
 | GET | `/api/me` | player | saved times after a page reload, plus rank once results are in |

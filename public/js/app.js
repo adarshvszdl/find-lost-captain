@@ -533,8 +533,8 @@ function renderStage() {
   hostWorld();
   const r = G.round, R = ROUNDS[r], where = R ? (R.type === "puzzle" ? "Final challenge" : "Island " + (r + 1) + " of 4") : "";
   if (G.phase === "lobby") {
-    stageRefs.count = h("span", { class: "dot", text: "0" }); stageRefs.names = h("div", { class: "stage-names" });
-    return screen(grow(), logo(false), h("div", { class: "stage-lobby" }, h("span", { class: "chip stage-count" }, stageRefs.count, h("span", { text: " pirates aboard" })), stageRefs.names), grow());
+    stageRefs.count = h("span", { class: "dot", text: "0" });
+    return screen(grow(), logo(false), h("div", { class: "stage-lobby" }, h("span", { class: "chip stage-count" }, stageRefs.count, h("span", { text: " pirates aboard" }))), grow());
   }
   if (G.phase === "rules") return screen(stageBanner(where, R.title, h("div", { class: "logo-sub", text: "Get ready…" })));
   if (G.phase === "round" || G.phase === "between") {
@@ -567,8 +567,6 @@ function updateStage() {
   if (!wantsStage() || !stage || !G) return;
   const R = ROUNDS[G.round];
   if (stageRefs.count) stageRefs.count.textContent = stage.aboard;
-  if (stageRefs.names) { const k = (stage.recent || []).join("|");
-    if (stageRefs.names.dataset.k !== k) { stageRefs.names.dataset.k = k; stageRefs.names.replaceChildren(...(stage.recent || []).map(n => h("span", { class: "nm-chip", text: n }))); } }
   if (stageRefs.done && stage.finished != null) {
     const of = R && R.type === "puzzle" && stage.able != null ? stage.able : stage.aboard;
     stageRefs.done.textContent = stage.finished + " of " + of + (R && R.type === "puzzle" ? " pirates with all 9 pieces finished" : " pirates finished");
