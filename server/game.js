@@ -78,7 +78,7 @@ const cleanName = s => String(s || "").replace(/[\u0000-\u001f\u007f]/g, "").rep
 const newToken = () => crypto.randomBytes(18).toString("base64url");
 const strip = p => { if (!p) return null; const { token, ...rest } = p; return rest; };
 
-export function createGame({ games, players, cache }) {
+export function createGame({ games, players, cache, introMs = 10000 }) {
   // id -> { token, gameId } for players this server copy has already verified (saves a read per request)
   const known = new Map();
   const sameToken = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -166,7 +166,7 @@ export function createGame({ games, players, cache }) {
       if (action === "start") {
         const i = Number(round);
         if (!Number.isInteger(i) || i < 0 || i >= ROUNDS.length) throw new HttpError(400, "Unknown round");
-        set = { phase: "round", round: i, roundStartedAt: now, endedAt: null };
+        set = { phase: "round", round: i, roundStartedAt: now, introMs, endedAt: null };
       } else if (action === "end") {
         if (cur.phase !== "round") throw new HttpError(409, "No challenge is running", { state: publicState(cur) });
         if (cur.round === ROUNDS.length - 1) {

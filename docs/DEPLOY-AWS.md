@@ -75,7 +75,7 @@ docker push <account>.dkr.ecr.<region>.amazonaws.com/captain-voyage:latest
 - Cluster: Fargate.
 - Task definition:
   - 0.5 vCPU, 1 GB memory, container port 8080
-  - environment: `MONGODB_DB=longlost_captain`, `PORT=8080`
+  - environment: `MONGODB_DB=longlost_captain`, `PORT=8080`, and optionally `INTRO_SECONDS` (the rules countdown before each challenge; default 10)
   - secrets: `MONGODB_URI` and `HOST_KEY` from the two Secrets Manager entries. The task execution role needs `secretsmanager:GetSecretValue` on them.
   - logs to CloudWatch (awslogs driver)
 - Service:

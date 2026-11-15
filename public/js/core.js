@@ -7,23 +7,24 @@ new Image().src = IMG_URL;
 
 const ROUNDS = [
   { key: "r1", type: "riddle", title: "Riddle Reef",
-    brief: "An ancient scroll on the reef holds the captain's riddle. Solve it to uncover the hidden clue. Wrong guesses cost 10 seconds.",
+    rules: ["Read the riddle and pick the right answer.", "Each wrong answer adds 10 seconds."],
     story: "Rolled up inside the scroll: pieces of the captain's portrait." },
   { key: "r2", type: "torch", title: "Shadow Cave Island",
-    brief: "The cave is pitch dark. Move your magical torch (mouse, or drag a finger) to find the captain's golden compass, then click or tap it once it's lit. Shells and bones are decoys.",
+    rules: ["It's dark. Move your torch with the mouse, or drag a finger, to light the way.", "Find the hidden object and tap it once it's lit. Anything else is a decoy."],
     story: "Under the compass, wrapped in oilcloth: more portrait pieces." },
   { key: "r3", type: "scramble", title: "Scramble Shores",
-    brief: "A message in a bottle holds a scrambled word. Tap the letters in the right order to rebuild it. A wrong word costs 5 seconds.",
+    rules: ["Tap the letters in the right order to unscramble the word.", "Each wrong word adds 5 seconds."],
     story: "The word was TREASURE, and the bottle held more portrait pieces." },
   { key: "r4", type: "lock", title: "Lockdown Island",
-    brief: "A treasure chest is sealed with a three-digit lock. Use the five clues scratched on the lid to crack the code. A wrong code costs 10 seconds.",
+    rules: ["Use the clues to work out the three-digit code.", "Each wrong code adds 10 seconds."],
     story: "Click! The chest swings open with the final portrait pieces inside." },
   { key: "r5", type: "puzzle", title: "Captain's Cove", cap: 180000,
-    brief: "Drag all 9 portrait pieces into the frame to reveal the captain. A piece snaps in when it's close to its spot. Your clock stops when the last one fits.",
+    rules: ["Drag the portrait pieces into the frame. A piece snaps in when it's close to its spot.", "Your clock stops when the last piece fits."],
     story: "" },
 ];
 const capFor = R => R.cap || CAP_MS;
 const missFor = R => capFor(R) + 30000;
+const capText = R => { const s = capFor(R) / 1000, m = Math.floor(s / 60); return (m ? m + " min" : "") + (s % 60 ? (m ? " " : "") + s % 60 + " s" : ""); };
 const RIDDLE = { q: "I have a bed but never sleep. I run but never walk. I have a mouth but never talk. What am I?",
   options: ["A river", "A ship", "A cave", "The wind"], answer: "A river" };
 const SCRAMBLE = { word: "TREASURE", shown: "SURETAER", hint: "What every pirate is searching for." };
