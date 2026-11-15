@@ -98,18 +98,20 @@ async function hostLogin(key) {
   hostKey = key; hostKeyOk = true; lsSet("llc:hostkey", key);
 }
 function updateHostMode() { isHost = wantsHost() && hostKeyOk; }
+const wantsStage = () => location.hash === "#stage";
 
 /* ---------- Boot ---------- */
 async function boot() {
   hostKey = lsGet("llc:hostkey") || "";
   if (hostKey) { try { await API.req("POST", "/api/host/login", null, { "x-host-key": hostKey }); hostKeyOk = true; } catch { hostKeyOk = false; } }
   updateHostMode();
-  addEventListener("hashchange", () => { updateHostMode(); viewAs = "auto"; currentKey = ""; if (isHost) pollPlayers(); render(true); });
+  addEventListener("hashchange", () => { updateHostMode(); viewAs = "auto"; currentKey = ""; if (isHost) pollPlayers(); if (wantsStage()) pollStage(); render(true); });
   setTimeout(() => { if (!gameLoaded) { gameSlow = true; currentKey = ""; render(); } }, 10000);
   await loadMe();
   connectStream();
-  setInterval(() => { if (isHost) pollPlayers(); }, 1500);
+  setInterval(() => { if (isHost) pollPlayers(); if (wantsStage()) pollStage(); }, 1500);
   if (isHost) pollPlayers();
+  if (wantsStage()) pollStage();
   render();
 }
 let renderPending = false, lastRender = 0;
@@ -127,6 +129,12 @@ function render(force) {
     if (currentKey === k) return;
     currentKey = k; cleanups.forEach(f => f()); cleanups = [];
     $ui.replaceChildren(hostLoginScreen()); measurePad(); return;
+  }
+  if (wantsStage()) {   // view-only: rebuild only when the step changes; numbers update in place
+    const k = stageKey();
+    if (k === currentKey) { updateStage(); return; }
+    currentKey = k; cleanups.forEach(f => f()); cleanups = [];
+    $ui.replaceChildren(renderStage()); updateStage(); return;
   }
   const hostMode = isHost && viewAs !== "player";
   const key = hostMode ? "host:" + Date.now() : playerKey();
@@ -286,17 +294,17 @@ function resultsPortrait() { return portrait(G.gameId, ALL_ROWS, seesCaptain());
 const capClosed = {};
 function syncCaptainReveal() {
   const on = !!(G && G.phase === "results" && G.captain), gid = on ? G.gameId : "";
-  const hostMode = isHost && viewAs !== "player", mode = hostMode ? "host" : "player";
+  const stageMode = wantsStage(), hostMode = !stageMode && isHost && viewAs !== "player", mode = stageMode ? "stage" : hostMode ? "host" : "player";
   const closedKey = capKey(mode);
   let el = document.getElementById("cap-reveal");
   if (!on || capClosed[closedKey] || lsGet(closedKey)) { if (el) el.remove(); return; }
   const me = myRank;
-  const line = hostMode ? "The crew is whole again. Ahoy, Captain!"
+  const line = stageMode ? "The crew is whole again!" : hostMode ? "The crew is whole again. Ahoy, Captain!"
     : me && me.rank ? "You found the captain and finished " + ordinal(me.rank) + " of " + G.totalPlayers + "!"
     : "Lost at sea this time, but the captain is home and the crew is whole again!";
   if (el && el.dataset.k === gid + mode) { el.querySelector(".cap-line").textContent = line; return; }   // the rank may arrive mid-animation
   if (el) el.remove();
-  const seenKey = "llc2:" + gid + ":capSeen", seen = !!lsGet(seenKey);
+  const seenKey = "llc2:" + gid + ":capSeen:" + mode, seen = !!lsGet(seenKey);
   lsSet(seenKey, 1);
   const order = revealOrder(gid), delay = i => (0.9 + order.indexOf(i) * 0.28).toFixed(2) + "s";
   const cover = portrait(gid, ALL_ROWS, false);
@@ -309,7 +317,7 @@ function syncCaptainReveal() {
     h("div", { class: "cap-stage" }, portrait(gid, ALL_ROWS, true), cover),
     h("div", { class: "big-word sun cap-found", text: "Found!" }),
     h("p", { class: "cap-line", text: line }),
-    h("button", { class: "gbtn big cap-close", onclick: close }, hostMode ? "Back to the results" : "See the standings"));
+    stageMode ? null : h("button", { class: "gbtn big cap-close", onclick: close }, hostMode ? "Back to the results" : "See the standings"));
   el.dataset.k = gid + mode;
   document.body.append(el);
 }
@@ -506,6 +514,70 @@ function revealNext() { return hostWrite("reveal"); }
 function publishResults() { return hostWrite("publish"); }
 function revealCaptain() { return hostWrite("captain"); }
 const holdsAllPieces = p => ALL_ROWS.every(i => { const k = ROUNDS[i].key; return p.times && p.times[k] != null && !(p.missed && p.missed[k]); });
+
+/* ---------- Stage (#stage): a view-only screen for a projector or a slide. No buttons, no joining. ---------- */
+let stage = null, stageRefs = {};
+async function pollStage() {
+  try {
+    const t0 = Date.now(), r = await API.req("GET", "/api/stage");
+    clockSkew = r.now - Math.round((t0 + Date.now()) / 2); stage = r; updateStage();
+  } catch {}
+}
+function stageKey() { return !gameLoaded ? "s:loading" : !G ? "s:none" : ["s", G.gameId, G.phase, G.round, G.reveal || 0, !!G.published, !!G.captain].join(":"); }
+function stageBanner(kicker, title, sub) {
+  return h("div", { class: "stage-banner" }, h("div", { class: "logo-kicker", text: kicker }), h("div", { class: "stage-title", text: title }), sub || null);
+}
+function renderStage() {
+  stageRefs = {};
+  if (!gameLoaded || !G) { worldIdle(); return screen(grow(), logo(false), grow()); }
+  hostWorld();
+  const r = G.round, R = ROUNDS[r], where = R ? (R.type === "puzzle" ? "Final challenge" : "Island " + (r + 1) + " of 4") : "";
+  if (G.phase === "lobby") {
+    stageRefs.count = h("span", { class: "dot", text: "0" }); stageRefs.names = h("div", { class: "stage-names" });
+    return screen(grow(), logo(false), h("div", { class: "stage-lobby" }, h("span", { class: "chip stage-count" }, stageRefs.count, h("span", { text: " pirates aboard" })), stageRefs.names), grow());
+  }
+  if (G.phase === "rules") return screen(stageBanner(where, R.title, h("div", { class: "logo-sub", text: "Get ready…" })));
+  if (G.phase === "round" || G.phase === "between") {
+    const live = G.phase === "round";
+    stageRefs.done = h("p", { class: "strong" }); stageRefs.bar = h("div", { class: "bar-fill", style: "width:0%" }); stageRefs.fast = h("div");
+    let sub = null;
+    if (live) {
+      const cap = capFor(R), clockEl = h("div", { class: "stage-clock" });
+      const tick = () => { const left = cap - (serverTime() - (G.roundStartedAt || serverTime())); clockEl.textContent = left > 0 ? clock(left) : "Time's up"; };
+      tick(); const iv = setInterval(tick, 100); cleanups.push(() => clearInterval(iv)); sub = clockEl;
+    }
+    const panel = h("div", { class: "stage-panel" }, sheet(live ? "Live" : "Fastest pirates", [
+      live ? stageRefs.done : null, live ? h("div", { class: "bar-track" }, stageRefs.bar) : null,
+      h("div", { class: "sub", text: live ? "First ashore" : R.title }), stageRefs.fast], { side: true, color: live ? "navy" : "green", enter: true }));
+    if (!live) { const next = ROUNDS[G.round + 1]; sub = next ? h("div", { class: "logo-sub", text: next.type === "puzzle" ? "Next: Captain's Cove" : "Next: " + next.title }) : null; }
+    return screen(stageBanner(live ? where : "Conquered!", R.title, sub), panel);
+  }
+  // results: the podium follows the first mate's reveals; once the captain is revealed, the overlay is the whole screen
+  if (G.captain) return screen();
+  const top = G.top || [], size = podiumSize(), shown = G.reveal || 0;
+  const plinth = place => { const p = top[place - 1], vis = p && place > size - shown;
+    return h("div", { class: "plinth p" + place + (vis ? "" : " hidden") + (vis && place === size - shown + 1 ? " new" : "") },
+      h("div", { class: "place", text: ordinal(place) }), h("div", { class: "pn", text: vis ? p.name : p ? "?" : "—" }), h("div", { class: "pt", text: vis ? fmt(p.total) : "" })); };
+  return screen(h("div", { class: "stage-results" }, sheet("Voyage complete!", [
+    h("div", { class: "results-grid" }, portrait(G.gameId, ALL_ROWS, false), h("div", { class: "podium" }, plinth(2), plinth(1), plinth(3))),
+    h("p", { class: "strong", style: "text-align:center", text: top.length ? (G.totalPlayers === 1 ? "1 pirate" : G.totalPlayers + " pirates") + " found the captain." : "No pirate found the captain this time." }),
+  ], { wide: true, color: "green", enter: true })));
+}
+function updateStage() {
+  if (!wantsStage() || !stage || !G) return;
+  const R = ROUNDS[G.round];
+  if (stageRefs.count) stageRefs.count.textContent = stage.aboard;
+  if (stageRefs.names) { const k = (stage.recent || []).join("|");
+    if (stageRefs.names.dataset.k !== k) { stageRefs.names.dataset.k = k; stageRefs.names.replaceChildren(...(stage.recent || []).map(n => h("span", { class: "nm-chip", text: n }))); } }
+  if (stageRefs.done && stage.finished != null) {
+    const of = R && R.type === "puzzle" && stage.able != null ? stage.able : stage.aboard;
+    stageRefs.done.textContent = stage.finished + " of " + of + (R && R.type === "puzzle" ? " pirates with all 9 pieces finished" : " pirates finished");
+    stageRefs.bar.style.width = (of ? Math.min(100, stage.finished / of * 100) : 0) + "%";
+  }
+  if (stageRefs.fast && stage.fastest) { const k = JSON.stringify(stage.fastest);
+    if (stageRefs.fast.dataset.k !== k) { stageRefs.fast.dataset.k = k;
+      stageRefs.fast.replaceChildren(stage.fastest.length ? topTable(stage.fastest.map(p => ({ name: p.name, total: p.t })), false) : h("p", { class: "muted", text: "Nobody yet. Who will be first?" })); } }
+}
 
 function hostWorld() {
   const r = G.round, gid = G.gameId;

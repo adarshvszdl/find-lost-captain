@@ -6,6 +6,7 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { connectDb } from "./db.js";
 import { createGameCache, createGame, HttpError } from "./game.js";
+import { ROUNDS } from "./rounds.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
@@ -42,6 +43,20 @@ app.get("/healthz", async (req, reply) => {
 });
 
 /* ---------- game state ---------- */
+// The stage screen (#stage): crowd numbers only, no tokens or controls. Uses the same 1 s player cache as the host.
+app.get("/api/stage", async (req, reply) => {
+  reply.header("cache-control", "no-store");
+  const g = cache.doc, list = g ? await cache.hostPlayers() : [];
+  const R = g && ROUNDS[g.round], key = R && R.key;
+  const out = { now: Date.now(), aboard: list.length, recent: list.slice(-14).reverse().map(p => p.name || "Pirate") };
+  if (key && (g.phase === "round" || g.phase === "between")) {
+    const done = list.filter(p => p.times[key] != null);
+    out.finished = done.length;
+    out.fastest = done.filter(p => !p.missed[key]).sort((a, b) => a.times[key] - b.times[key]).slice(0, 5).map(p => ({ name: p.name || "Pirate", t: p.times[key] }));
+    if (g.round === ROUNDS.length - 1) out.able = list.filter(p => ROUNDS.slice(0, -1).every(E => p.times[E.key] != null && !p.missed[E.key])).length;
+  }
+  return out;
+});
 app.get("/api/state", async (req, reply) => { reply.header("cache-control", "no-store").type("application/json"); return cache.json; });
 
 // Server-Sent Events: pushes the full public state whenever it changes, plus a ping every 15 s.

@@ -88,6 +88,17 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px 
 .target-glow { flex: none; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle, rgba(255,214,120,.55), rgba(255,180,60,.12) 60%, transparent 72%); }
 .target-icon { width: 54px; height: 54px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
 .target-name { font-family: var(--f-display); font-size: 1.3rem; color: var(--sun); line-height: 1.1; }
+/* Stage (#stage): view-only screen for sharing */
+.stage-banner { position: fixed; top: 4vh; left: 3vw; z-index: 2; display: grid; justify-items: start; gap: 6px; text-align: left; pointer-events: none; width: max-content; max-width: 92vw; animation: popIn .6s cubic-bezier(.2, 1.5, .4, 1) both; }
+.stage-title { font-family: var(--f-display); font-size: clamp(2.6rem, 6vw, 5rem); line-height: 1; color: var(--white); text-shadow: var(--outline), 0 8px 0 var(--navy); transform: rotate(-1.5deg); }
+.stage-clock { margin-top: 10px; font-family: var(--f-display); font-size: clamp(2.4rem, 5vw, 4.2rem); line-height: 1; color: var(--sun); text-shadow: var(--outline), 0 6px 0 var(--navy); font-variant-numeric: tabular-nums; }
+.stage-panel { position: fixed; right: 3vw; top: 56%; transform: translateY(-50%); width: min(380px, 36vw); z-index: 2; }
+.stage-lobby { display: grid; justify-items: center; gap: 16px; margin-top: 22px; pointer-events: none; }
+.stage-count { font-size: 1.35rem; padding: 8px 18px 8px 10px; }
+.stage-count .dot { min-width: 40px; height: 40px; border-radius: 20px; font-size: 1.3rem; }
+.stage-names { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: min(820px, 90vw); }
+.stage-names .nm-chip { animation: popIn .4s cubic-bezier(.2, 1.5, .4, 1) both; }
+.stage-results { position: fixed; left: 50%; top: 52%; transform: translate(-50%, -50%); width: min(860px, 94vw); z-index: 2; }
 .intro-foot { display: flex; align-items: center; justify-content: center; gap: 14px; }
 .enter { animation: popIn .45s cubic-bezier(.2, 1.5, .4, 1) both; }
 @keyframes popIn { from { opacity: 0; transform: translateY(30px) scale(.94); } }
