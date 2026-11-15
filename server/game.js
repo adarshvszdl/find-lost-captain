@@ -180,18 +180,20 @@ export function createGame({ games, players, cache }) {
         if (cur.phase !== "round") throw new HttpError(409, "No challenge is running", { state: publicState(cur) });
         if (cur.round === ROUNDS.length - 1) {
           const list = await players.find({ gameId: cur.gameId }, { projection: { token: 0 } }).toArray();
-          const rows = computeStandings(list), ranks = {};
-          rows.forEach((p, i) => { ranks[p.id] = { rank: i + 1, total: p.total }; });
-          set = { phase: "results", endedAt: now, resultsAt: now, ranks, totalPlayers: rows.length, reveal: 0, published: false,
-            top: rows.slice(0, 10).map(p => ({ name: p.name, total: p.total, solved: p.solved })) };
+          // Only pirates who found the captain are ranked; everyone else is "lost at sea" with no rank or total.
+          const rows = computeStandings(list), found = rows.filter(p => p.found), ranks = {};
+          found.forEach((p, i) => { ranks[p.id] = { rank: i + 1, total: p.total }; });
+          rows.forEach(p => { if (!p.found) ranks[p.id] = { lost: true }; });
+          set = { phase: "results", endedAt: now, resultsAt: now, ranks, totalPlayers: found.length, crewSize: rows.length, reveal: 0, published: false, captain: false,
+            top: found.slice(0, 10).map(p => ({ name: p.name, total: p.total })) };
         } else set = { phase: "between", endedAt: now };
       } else if (action === "reveal") {
         set = { reveal: Math.min(Math.min(3, (cur.top || []).length), (cur.reveal || 0) + 1) };
-      } else if (action === "captain") {   // show the captain's face on every player's screen
-        if (cur.phase !== "results") throw new HttpError(409, "The results aren't in yet", { state: publicState(cur) });
+      } else if (action === "captain") {   // the big reveal: the captain's face on every screen
+        if (cur.phase !== "results" || !cur.published) throw new HttpError(409, "Publish the winners first", { state: publicState(cur) });
         set = { captain: true };
       } else if (action === "publish") {
-        set = { reveal: Math.min(3, (cur.top || []).length), published: true, captain: true };
+        set = { reveal: Math.min(3, (cur.top || []).length), published: true };
       } else throw new HttpError(400, "Unknown action");
       const r = await games.updateOne({ _id: GAME_ID, version: ver }, { $set: set, $inc: { version: 1 } });
       if (!r.matchedCount) throw new HttpError(409, "The game changed at the same moment; try again", { state: publicState(await games.findOne({ _id: GAME_ID })) });

@@ -122,8 +122,8 @@ for (let r = 0; r < ROUND_KEYS.length; r++) {
   await sleep(BETWEEN_MS);
 }
 for (let k = 0; k < 3; k++) { await hostAction("reveal"); await sleep(800); }
-await hostAction("captain"); await sleep(800);
-await hostAction("publish");
+await hostAction("publish"); await sleep(800);
+await hostAction("captain");
 await sleep(5000);
 clearInterval(hostPoll);
 
@@ -146,7 +146,7 @@ const summary = {
   target: BASES, players: N, durationSec: Math.round((Date.now() - started) / 1000),
   streams: { peakOpen: streamPeak, drops: streamDrops },
   hostActionToPlayerMs: { samples: fanout.length, p50: pct(fanout, 50), p95: pct(fanout, 95), p99: pct(fanout, 99), max: fanout.length ? Math.max(...fanout) : 0 },
-  checks: { joined: joinedOk, savedPlayersFound: byId.size, missingSaved, timeMismatch, rankMissing, resultsTotalPlayers: finalState?.totalPlayers, published: finalState?.published },
+  checks: { joined: joinedOk, savedPlayersFound: byId.size, missingSaved, timeMismatch, rankMissing, crewSize: finalState?.crewSize, rankedPlayers: finalState?.totalPlayers, published: finalState?.published },
   errors, latencyMs: rows,
 };
 console.table(rows);
@@ -156,6 +156,6 @@ fs.mkdirSync(outDir, { recursive: true });
 const file = path.join(outDir, "run-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json");
 fs.writeFileSync(file, JSON.stringify(summary, null, 2));
 console.log("Saved", file);
-const pass = joinedOk === N && missingSaved === 0 && timeMismatch === 0 && rankMissing === 0 && finalState?.totalPlayers === N && !Object.keys(errors).some(k => !k.startsWith("stream"));
+const pass = joinedOk === N && missingSaved === 0 && timeMismatch === 0 && rankMissing === 0 && finalState?.crewSize === N && !Object.keys(errors).some(k => !k.startsWith("stream"));
 console.log(pass ? "PASS" : "CHECK THE NUMBERS ABOVE");
 process.exit(pass ? 0 : 2);

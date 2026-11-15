@@ -24,7 +24,8 @@ npm run local               # starts on http://localhost:8080
 2. Players open the plain link and join with a name.
 3. For each island the first mate clicks **Show the rules** (players see the island's rules and wait), then **Start the challenge**, then ends it. Each player's clock starts when the challenge appears on their own screen.
 4. Only pirates who won all four islands hold all nine pieces, so only they play the final portrait challenge; the rest see an "Out of the race" screen.
-5. At the results, the first mate reveals 3rd, 2nd and 1st place, then clicks **Reveal the captain to everyone** (until then the portrait stays face-down for anyone who didn't assemble it), then **Publish results to players**.
+5. Only pirates who found the captain (won all five challenges) are ranked; everyone else is "lost at sea" with no rank or total time.
+6. At the results, the first mate reveals 3rd, 2nd and 1st place, clicks **Publish the winners to players**, then **Reveal the lost captain!**: a full-screen reveal of the captain's face on every screen at once. Until then the portrait stays face-down for anyone who didn't assemble it.
 
 ## Project layout
 

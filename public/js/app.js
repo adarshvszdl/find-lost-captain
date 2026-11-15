@@ -10,7 +10,6 @@ let players = [];
 let viewAs = "auto";
 let joinErr = "", writeErr = "", confirmReset = false, hostBusy = false, toolsOpen = false, keyOpen = false;
 const submitted = {};
-let hostCaptainSeen = "";
 let currentKey = "", cleanups = [], hostScreenKey = "", hostTimerIv = null, clockSkew = 0;
 const serverTime = () => Date.now() + clockSkew;
 
@@ -28,7 +27,7 @@ const FINAL = ROUNDS.length - 1;
 // Only pirates who won all four islands hold all nine pieces, so only they can assemble the portrait.
 const canAssemble = () => earnedRows(FINAL - 1).length === ALL_ROWS.length;
 const assembledIt = () => { const res = G && myResult(ROUNDS[FINAL].key); return !!(res && !res.missed); };
-const seesCaptain = () => !!(G && (G.captain || G.published)) || assembledIt();
+const seesCaptain = () => !!(G && G.captain) || assembledIt();
 function roundEnded(i) {
   if (!G || G.phase === "lobby") return false;
   return i < G.round || (i === G.round && (G.phase === "between" || G.phase === "results"));
@@ -119,6 +118,7 @@ function scheduleRender() {
 /* ---------- Render dispatch ---------- */
 function render(force) {
   lastRender = Date.now();
+  syncCaptainReveal();
   if (wantsHost() && !hostKeyOk) {
     const k = "hostlogin:" + hostLoginErr;
     if (currentKey === k) return;
@@ -275,11 +275,39 @@ function renderLocked() {
   ], { color: "navy", enter: true })));
 }
 /* The portrait at the results: face-down until the first mate reveals the captain (or you assembled it yourself). */
-function resultsPortrait() {
-  if (!seesCaptain()) return portrait(G.gameId, ALL_ROWS, false);
-  const el = portrait(G.gameId, ALL_ROWS, true), k = "llc2:" + G.gameId + ":captainSeen";
-  if (!assembledIt() && !lsGet(k)) { el.classList.add("unveil"); lsSet(k, 1); }
-  return el;
+function resultsPortrait() { return portrait(G.gameId, ALL_ROWS, seesCaptain()); }
+
+/* The big reveal: when the first mate reveals the captain, every screen (host, winners, the lost) gets this
+   full-screen moment. It lives outside #ui so the host's frequent re-renders don't restart it. */
+const capClosed = {};
+function syncCaptainReveal() {
+  const on = !!(G && G.phase === "results" && G.captain), gid = on ? G.gameId : "";
+  const hostMode = isHost && viewAs !== "player", mode = hostMode ? "host" : "player";
+  const closedKey = "llc2:" + gid + ":capClosed:" + mode;
+  let el = document.getElementById("cap-reveal");
+  if (!on || capClosed[closedKey] || lsGet(closedKey)) { if (el) el.remove(); return; }
+  const me = myRank;
+  const line = hostMode ? "The crew is whole again. Ahoy, Captain!"
+    : me && me.rank ? "You found the captain and finished " + ordinal(me.rank) + " of " + G.totalPlayers + "!"
+    : "Lost at sea this time, but the captain is home and the crew is whole again!";
+  if (el && el.dataset.k === gid + mode) { el.querySelector(".cap-line").textContent = line; return; }   // the rank may arrive mid-animation
+  if (el) el.remove();
+  const seenKey = "llc2:" + gid + ":capSeen", seen = !!lsGet(seenKey);
+  lsSet(seenKey, 1);
+  const order = revealOrder(gid), delay = i => (0.9 + order.indexOf(i) * 0.28).toFixed(2) + "s";
+  const cover = portrait(gid, ALL_ROWS, false);
+  cover.classList.add("cap-cover");
+  cover.querySelectorAll("svg > g").forEach((g, i) => { g.style.animationDelay = delay(i); });
+  const close = () => { capClosed[closedKey] = true; lsSet(closedKey, 1); el.classList.add("out"); setTimeout(() => el.remove(), 500); };
+  el = h("div", { id: "cap-reveal", class: "overlay cap-reveal" + (seen ? " done" : ""), role: "dialog", "aria-label": "The lost captain is revealed" },
+    h("div", { class: "rays on" }),
+    h("div", { class: "cap-kicker", text: "Our long-lost captain is…" }),
+    h("div", { class: "cap-stage" }, portrait(gid, ALL_ROWS, true), cover),
+    h("div", { class: "big-word sun cap-found", text: "Found!" }),
+    h("p", { class: "cap-line", text: line }),
+    h("button", { class: "gbtn big cap-close", onclick: close }, hostMode ? "Back to the results" : "See the standings"));
+  el.dataset.k = gid + mode;
+  document.body.append(el);
 }
 
 function renderPlay(r) {
@@ -417,17 +445,21 @@ function renderPlayerResults() {
   const me = myRank;
   World.place(5); World.set({ visible: 4, cleared: 5, focus: 4, zoom: "fit", follow: false });
   const hud = playerHud(piecesUpTo(earnedRows(3)));
-  if (!G.published) return screen(hud, grow(), dock(sheet("Voyage complete", [
+  const found = assembledIt();   // only pirates who found the captain are ranked
+  if (!G.published) return screen(hud, grow(), dock(sheet(found ? "Voyage complete" : "Lost at sea", [
     h("div", { class: "res-grid" }, resultsPortrait(),
-      h("div", { style: "display:grid;gap:8px" }, h("div", { class: "label", text: "Your total time" }), h("div", { class: "big-time", text: me ? fmt(me.total) : "—" }),
-        h("p", { class: "strong", text: seesCaptain() ? "Watch the first mate's screen: the winners are about to be revealed!" : "Watch the first mate's screen: the winners and the captain's face are about to be revealed!" }))),
-  ], { color: "green", enter: true })));
+      found ? h("div", { style: "display:grid;gap:8px" }, h("div", { class: "label", text: "Your total time" }), h("div", { class: "big-time", text: me && me.total ? fmt(me.total) : "—" }),
+          h("p", { class: "strong", text: "Watch the first mate's screen: the winners are about to be revealed!" }))
+        : h("div", { style: "display:grid;gap:8px" },
+          h("p", { class: "strong", text: "You didn't reach the captain this time, so you're not in the standings." }),
+          h("p", { class: "muted small", text: "Stay here: the winners are about to be revealed, and then the captain's face." }))),
+  ], { color: found ? "green" : "navy", enter: true })));
   return screen(hud, grow(), dock(sheet("Final standings", [
-    assembledIt() ? null : h("div", { style: "width:min(170px,60%);margin:0 auto" }, resultsPortrait()),
-    me ? h("div", { style: "display:grid;gap:8px;justify-items:center;text-align:center" }, h("div", { class: "label", text: "You finished" }), h("div", { class: "medal-big", text: ordinal(me.rank) }),
-      h("p", { class: "strong" }, "of " + G.totalPlayers + " pirates · total ", h("span", { style: "font-family:var(--f-display);font-weight:400;font-size:1.2rem", text: fmt(me.total) })))
-      : h("p", { class: "muted", text: "You joined after the results were counted." }),
-    topTable((G.top || []).slice(0, 10).map(p => ({ name: p.name, total: p.total })), false),
+    h("div", { style: "width:min(170px,60%);margin:0 auto" }, resultsPortrait()),
+    me && me.rank ? h("div", { style: "display:grid;gap:8px;justify-items:center;text-align:center" }, h("div", { class: "label", text: "You finished" }), h("div", { class: "medal-big", text: ordinal(me.rank) }),
+      h("p", { class: "strong" }, "of " + G.totalPlayers + " pirates who found the captain · total ", h("span", { style: "font-family:var(--f-display);font-weight:400;font-size:1.2rem", text: fmt(me.total) })))
+      : h("p", { class: "strong", style: "text-align:center", text: "Lost at sea: only pirates who found the captain are ranked." }),
+    (G.top || []).length ? topTable(G.top.slice(0, 10).map(p => ({ name: p.name, total: p.total })), false) : h("p", { class: "muted", text: "No pirate found the captain this time." }),
   ], { color: "green", enter: true })));
 }
 function topTable(rows, live) {
@@ -493,7 +525,7 @@ function toolsMenu() {
 }
 function renderHost() {
   if (hostTimerIv) { clearInterval(hostTimerIv); hostTimerIv = null; }
-  const sk = !gameLoaded ? "loading" : !G ? "none" : [G.gameId, G.phase, G.round, G.reveal || 0, !!G.published].join(":");
+  const sk = !gameLoaded ? "loading" : !G ? "none" : [G.gameId, G.phase, G.round, G.reveal || 0, !!G.published, !!G.captain].join(":");
   const enter = sk !== hostScreenKey; hostScreenKey = sk;
   const n = players.length;
   const top = h("div", { class: "host-top" }, logo(true),
@@ -505,7 +537,11 @@ function renderHost() {
     h("button", { class: "gbtn green big", disabled: hostBusy, onclick: newGame }, "Open the game"), errP], { enter })], null)); }
   hostWorld();
   const rows = standings(), results = G.phase === "results";
-  const side = results && !G.published ? null : sheet(results ? "Final standings" : "Crew standings", [
+  const lostAtSea = (G.crewSize || 0) - (G.totalPlayers || 0);
+  const side = results && !G.published ? null : results ? sheet("Final standings", [
+    (G.top || []).length ? topTable(G.top.map(p => ({ name: p.name, total: p.total })), false) : h("p", { class: "muted", text: "No pirate found the captain this time." }),
+    lostAtSea > 0 ? h("p", { class: "muted small", text: lostAtSea + (lostAtSea === 1 ? " pirate was" : " pirates were") + " lost at sea and aren't ranked." }) : null], { side: true, color: "navy", enter })
+  : sheet("Crew standings", [
     G.phase === "round" ? h("div", { class: "sub", text: "Finished challenges only" }) : null,
     rows.length ? topTable(rows.slice(0, 15).map(p => ({ name: p.name, total: G.phase === "lobby" ? null : p.total, doneNow: p.doneNow })), G.phase === "round") : h("p", { class: "muted", text: "Nobody has joined yet." }),
     rows.length > 15 ? h("p", { class: "muted small", text: "+ " + (rows.length - 15) + " more" }) : null], { side: true, color: "navy", enter });
@@ -556,21 +592,20 @@ function hostStage(rows, enter, errP) {
   const plinth = place => { const p = top[place - 1], vis = p && place > size - shown;
     return h("div", { class: "plinth p" + place + (vis ? "" : " hidden") + (vis && enter && place === size - shown + 1 ? " new" : "") },
       h("div", { class: "place", text: ordinal(place) }), h("div", { class: "pn", text: vis ? p.name : p ? "?" : "—" }), h("div", { class: "pt", text: vis ? fmt(p.total) : "" })); };
-  const shownCaptain = !!(G.captain || G.published);
-  // The shared screen keeps the portrait face-down until the first mate reveals the captain.
-  function hostPortrait() {
-    const el = portrait(G.gameId, ALL_ROWS, shownCaptain);
-    if (shownCaptain && hostCaptainSeen !== G.gameId) { el.classList.add("unveil"); hostCaptainSeen = G.gameId; }
-    return el;
-  }
+  // Order: reveal 3rd, 2nd, 1st → publish the winners → the big captain reveal on every screen.
+  const shownCaptain = !!G.captain;
+  const reopen = () => { const k = "llc2:" + G.gameId + ":capClosed:host"; delete capClosed[k]; lsSet(k, ""); syncCaptainReveal(); };
+  const step = nextPlace > 0 ? h("button", { class: "gbtn big", disabled: hostBusy, onclick: revealNext }, nextPlace === 1 ? "Reveal the winner" : "Reveal " + ordinal(nextPlace) + " place")
+    : !G.published ? h("button", { class: "gbtn green big", disabled: hostBusy, onclick: publishResults }, "Publish the winners to players")
+    : !shownCaptain ? h("button", { class: "gbtn coral big", disabled: hostBusy, onclick: revealCaptain }, "Reveal the lost captain!")
+    : h("button", { class: "gbtn plain", onclick: reopen }, "Show the captain again");
+  const note = !G.published ? (size ? "Reveal the podium, then publish the winners. Only pirates who found the captain are ranked." : "No pirate found the captain this time. Publish to show everyone the results.")
+    : !shownCaptain ? "Players can see the standings. Now for the big moment: the captain's face, on every screen at once."
+    : "The captain is revealed on every screen. Over to you, Captain!";
   return [sheet(shownCaptain ? "The captain is found!" : "Voyage complete!", [
-    h("div", { class: "results-grid" }, hostPortrait(), h("div", { class: "podium" }, plinth(2), plinth(1), plinth(3))),
-    h("div", { class: "row" },
-      nextPlace > 0 ? h("button", { class: "gbtn big", disabled: hostBusy, onclick: revealNext }, nextPlace === 1 ? "Reveal the winner" : "Reveal " + ordinal(nextPlace) + " place")
-        : !shownCaptain ? h("button", { class: "gbtn big", disabled: hostBusy, onclick: revealCaptain }, "Reveal the captain to everyone") : null,
-      G.published ? liveChip("Results published to players")
-        : h("button", { class: "gbtn green" + (nextPlace > 0 ? "" : " big"), disabled: hostBusy, onclick: publishResults }, "Publish results to players")),
-    h("p", { class: "muted small", text: G.published ? "Every player can now see their own place and the top 10. Over to you, Captain!" : (shownCaptain ? "The captain's face is on every player's screen. " : "Players who didn't assemble the portrait haven't seen the captain yet. ") + "Players see only their own total until you publish." }), errP],
+    h("div", { class: "results-grid" }, portrait(G.gameId, ALL_ROWS, shownCaptain), h("div", { class: "podium" }, plinth(2), plinth(1), plinth(3))),
+    h("div", { class: "row" }, step, G.published ? liveChip("Winners published") : null),
+    h("p", { class: "muted small", text: note }), errP],
     { wide: true, color: "green", enter })];
 }
 boot();

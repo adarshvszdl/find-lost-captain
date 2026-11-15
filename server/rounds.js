@@ -17,6 +17,7 @@ export function computeStandings(players) {
       total += t != null ? t : missFor(R);
       if (t != null && !(p.missed && p.missed[R.key])) solved++;
     }
-    return { id: p._id, name: p.name || "Unnamed pirate", total, solved, joinedAt: p.joinedAt || 0 };
+    // "found" = won every challenge, portrait included. Only these pirates are ranked.
+    return { id: p._id, name: p.name || "Unnamed pirate", total, solved, found: solved === ROUNDS.length, joinedAt: p.joinedAt || 0 };
   }).sort((a, b) => a.total - b.total || b.solved - a.solved || a.joinedAt - b.joinedAt);
 }
