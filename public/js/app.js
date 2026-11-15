@@ -183,7 +183,8 @@ function playerKey() {
   if (!joined()) return "join:" + G.gameId + ":" + joinErr + tag;
   const r = G.round, rk = ROUNDS[r] && ROUNDS[r].key;
   if (G.phase === "lobby") return "lobby:" + G.gameId + tag;
-  if (G.phase === "round" && !myResult(rk)) return (inIntro(r) ? "intro:" : "play:") + G.gameId + ":" + r + tag;
+  if (G.phase === "rules") return "rules:" + G.gameId + ":" + r + tag;
+  if (G.phase === "round" && !myResult(rk)) return "play:" + G.gameId + ":" + r + tag;
   if (G.phase === "round" || G.phase === "between") return "after:" + G.gameId + ":" + r + ":" + !!myResult(rk) + tag;
   if (G.phase === "results") return "results:" + G.gameId + ":" + (G.resultsAt || 0) + ":" + !!G.published + tag;
   return "unknown" + tag;
@@ -194,7 +195,8 @@ function renderPlayer() {
   if (!joined()) return renderJoin();
   const r = G.round, R = ROUNDS[r];
   if (G.phase === "lobby") return renderLobby();
-  if (G.phase === "round" && !myResult(R.key)) return inIntro(r) ? renderIntro(r) : renderPlay(r);
+  if (G.phase === "rules") return renderRules(r);
+  if (G.phase === "round" && !myResult(R.key)) return renderPlay(r);
   if (G.phase === "round" || G.phase === "between") return renderAfter(r);
   if (G.phase === "results") return renderPlayerResults();
   return titleScreen(dialogBox("Waiting for the first mate."));
@@ -202,7 +204,7 @@ function renderPlayer() {
 function islandPips() {
   return h("div", { class: "pips", role: "img", "aria-label": "Voyage progress" }, [0, 1, 2, 3, 4].map(i => {
     const R = ROUNDS[i], done = roundEnded(i) || !!(G && G.phase !== "lobby" && i <= G.round && myResult(R.key));
-    const now = !done && G && (G.phase === "round" || G.phase === "between") && G.round === i;
+    const now = !done && G && (G.phase === "rules" || G.phase === "round" || G.phase === "between") && G.round === i;
     return h("span", { class: "pip" + (done ? " done" : now ? " now" : ""), title: R.title }, i < 4 ? String(i + 1) : "★");
   }));
 }
@@ -238,29 +240,16 @@ function renderLobby() {
   return screen(playerHud(0), grow(), dock(dialogBox(STORY, liveChip("You're aboard! Waiting for the first mate to set sail."))));
 }
 
-/* Before each challenge: its rules and a countdown (the server's INTRO_SECONDS). The player's clock starts after it. */
-const introEnds = {};
-function introEndsAt(r) {
-  const k = "llc2:" + G.gameId + ":" + ROUNDS[r].key, ms = Number(G.introMs) || 0;
-  if (!ms || lsGet(k)) return 0;   // no intro, or this challenge already opened on this device
-  let end = introEnds[k] || Number(lsGet(k + ":intro"));
-  if (!end || end > Date.now() + ms) { end = Date.now() + ms; lsSet(k + ":intro", end); }
-  return (introEnds[k] = end);
-}
-const inIntro = r => Date.now() < introEndsAt(r);
-function renderIntro(r) {
-  const R = ROUNDS[r], end = introEndsAt(r);
+/* Before each challenge the first mate shows its rules; players wait here until the first mate starts it. */
+function renderRules(r) {
+  const R = ROUNDS[r];
   World.set({ visible: Math.min(r, 4), cleared: r, focus: r, zoom: "fit", follow: false });
   World.sail(r, r + 1, G.gameId + ":arrive:" + r);
-  const left = () => Math.max(0, end - Date.now());
-  const num = h("div", { class: "intro-num", text: String(Math.ceil(left() / 1000)) });
-  const iv = setInterval(() => { if (!left()) { clearInterval(iv); render(); } else num.textContent = Math.ceil(left() / 1000); }, 200);
-  cleanups.push(() => clearInterval(iv));
   const rules = [...R.rules, "You have " + capText(R) + ". Your clock starts when the challenge appears."];
   return screen(playerHud(piecesUpTo(earnedRows(r - 1))), grow(), dock(sheet(R.title, [
     h("div", { class: "sheet-head" }, h("div", { class: "sub", text: R.type === "puzzle" ? "Final challenge" : "Island " + (r + 1) + " of 4" }), h("div", { class: "sub", text: "Rules" })),
     h("ul", { class: "rules" }, rules.map(t => h("li", { text: t }))),
-    h("div", { class: "intro-foot" }, h("span", { class: "sub", text: "Starting in" }), num),
+    h("div", { class: "intro-foot" }, liveChip("Get ready! The first mate will start the challenge.")),
   ], { color: "navy", enter: true })));
 }
 
@@ -442,6 +431,7 @@ async function hostWrite(action, extra) {
   hostBusy = false; render(true); pollPlayers();
 }
 function newGame() { confirmReset = false; toolsOpen = false; return hostWrite("new"); }
+function showRules(i) { return hostWrite("rules", { round: i }); }
 function startRound(i) { return hostWrite("start", { round: i }); }
 function endRound() { return hostWrite("end"); }
 const podiumSize = () => Math.min(3, (G.top || []).length);
@@ -451,7 +441,7 @@ function publishResults() { return hostWrite("publish"); }
 function hostWorld() {
   const r = G.round, gid = G.gameId;
   if (G.phase === "lobby") World.set({ ship: 0, visible: 0, cleared: 0, focus: null, zoom: 1, follow: false });
-  else if (G.phase === "round") { World.set({ visible: Math.min(r, 4), cleared: r, focus: r, zoom: "fit", follow: false }); World.sail(r, r + 1, "h:" + gid + ":arrive:" + r); }
+  else if (G.phase === "rules" || G.phase === "round") { World.set({ visible: Math.min(r, 4), cleared: r, focus: r, zoom: "fit", follow: false }); World.sail(r, r + 1, "h:" + gid + ":arrive:" + r); }
   else if (G.phase === "between") { World.set({ visible: r + 1, cleared: r + 1, focus: r + 1, zoom: "fit", follow: false }); World.sail(r + 1, r + 2, "h:" + gid + ":sail:" + r); }
   else if (G.phase === "results") { World.place(5); World.set({ visible: 4, cleared: 5, focus: 4, zoom: "fit", follow: false }); }
 }
@@ -499,13 +489,16 @@ function hostStage(rows, enter, errP) {
     n ? h("div", { class: "names" }, players.slice().sort((a, b) => (b.joinedAt || 0) - (a.joinedAt || 0)).slice(0, 40).map(p => h("span", { class: "nm-chip", text: p.name || "Pirate" })))
       : h("p", { class: "muted", text: "No one has joined yet." }),
     h("p", { class: "small strong", text: "Players open this site's link from the chat (without #host on the end) and join from their own devices. No sign-in needed." }),
-    h("button", { class: "gbtn green big", disabled: hostBusy || n === 0, onclick: () => startRound(0) }, "Set sail for Riddle Reef"), errP], { enter })];
+    h("button", { class: "gbtn green big", disabled: hostBusy || n === 0, onclick: () => showRules(0) }, "Set sail for Riddle Reef"), errP], { enter })];
+  if (G.phase === "rules") return [sheet(R.title, [
+    h("div", { class: "sheet-head" }, h("div", { class: "sub", text: R.type === "puzzle" ? "Final challenge" : "Island " + (r + 1) + " of 4" }), liveChip("Rules on screen")),
+    h("ul", { class: "rules" }, [...R.rules, "Time limit: " + capText(R) + "."].map(t => h("li", { text: t }))),
+    h("p", { class: "muted small", text: "Players are reading these rules now. Start when the crew is ready; each player's clock starts when the challenge appears on their screen." }),
+    h("button", { class: "gbtn green big", disabled: hostBusy, onclick: () => startRound(r) }, R.type === "puzzle" ? "Start the final challenge" : "Start the challenge"), errP], { color: "navy", enter })];
   if (G.phase === "round") {
     const done = rows.filter(p => p.doneNow).length, cap = capFor(R);
     const timer = h("div", { class: "countdown" });
-    const go = (G.roundStartedAt || serverTime()) + (Number(G.introMs) || 0);   // players read the rules first
-    const tick = () => { const now = serverTime(); if (now < go) { timer.textContent = "Rules " + Math.ceil((go - now) / 1000) + "s"; timer.classList.remove("over"); return; }
-      const left = cap - (now - go); timer.textContent = left > 0 ? clock(left) : "Time's up"; timer.classList.toggle("over", left <= 0); };
+    const tick = () => { const left = cap - (serverTime() - (G.roundStartedAt || serverTime())); timer.textContent = left > 0 ? clock(left) : "Time's up"; timer.classList.toggle("over", left <= 0); };
     tick(); hostTimerIv = setInterval(tick, 100);
     return [sheet(R.title, [
       h("div", { class: "sheet-head" }, h("div", { class: "sub", text: R.type === "puzzle" ? "Final challenge" : "Island " + (r + 1) + " of 4" }), liveChip("Live")),
@@ -513,7 +506,7 @@ function hostStage(rows, enter, errP) {
       h("div", { class: "bar-track" }, h("div", { class: "bar-fill", style: "width:" + (n ? done / n * 100 : 0) + "%" })),
       h("p", { class: "strong", text: done + " of " + n + " pirates finished" }),
       h("p", { class: "muted small", text: R.rules.join(" ") }),
-      h("p", { class: "muted small", text: (G.introMs ? "Players see the rules for " + Math.round(G.introMs / 1000) + " s first. " : "") + "Each player's clock starts when the challenge appears on their screen. Anyone still playing when you end it gets " + fmt(missFor(R)) + "." }),
+      h("p", { class: "muted small", text: "Each player's clock starts when the challenge appears on their screen. Anyone still playing when you end it gets " + fmt(missFor(R)) + "." }),
       h("button", { class: "gbtn coral big", disabled: hostBusy, onclick: endRound }, R.type === "puzzle" ? "End game & count results" : "End this challenge"), errP], { enter })];
   }
   if (G.phase === "between") {
@@ -523,7 +516,7 @@ function hostStage(rows, enter, errP) {
       h("div", { class: "sub", text: "Fastest pirates" }),
       fastest.length ? topTable(fastest.map(p => ({ name: p.name, total: p.times[R.key] })), false) : h("p", { class: "muted", text: "Nobody finished this one." }),
       h("p", { class: "strong", text: piecesIn(r) + " portrait pieces recovered. " + (next.type === "puzzle" ? "The ship drops anchor at Captain's Cove, where the crew will assemble the portrait." : "The ship sails on to " + next.title + ".") }),
-      h("button", { class: "gbtn green big", disabled: hostBusy, onclick: () => startRound(r + 1) }, next.type === "puzzle" ? "Start the final challenge" : "Start " + next.title), errP], { color: "green", enter })];
+      h("button", { class: "gbtn green big", disabled: hostBusy, onclick: () => showRules(r + 1) }, next.type === "puzzle" ? "Show the final challenge's rules" : "Show the rules for " + next.title), errP], { color: "green", enter })];
   }
   const top = G.top || [], size = podiumSize(), shown = G.reveal || 0, nextPlace = size - shown;
   const plinth = place => { const p = top[place - 1], vis = p && place > size - shown;

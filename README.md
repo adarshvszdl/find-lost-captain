@@ -22,7 +22,7 @@ npm run local               # starts on http://localhost:8080
 
 1. The first mate opens `/#host`, signs in and clicks **Open the game**.
 2. Players open the plain link and join with a name.
-3. The first mate starts each island, then ends it. Players first see that island's rules with a countdown (`INTRO_SECONDS` in `.env`, default 10; 0 turns it off). Each player's clock starts when the challenge appears on their own screen.
+3. For each island the first mate clicks **Show the rules** (players see the island's rules and wait), then **Start the challenge**, then ends it. Each player's clock starts when the challenge appears on their own screen.
 4. After the last challenge (the portrait), the first mate reveals 3rd, 2nd and 1st place, then clicks **Publish results to players**.
 
 ## Project layout
@@ -53,7 +53,7 @@ npm run local               # starts on http://localhost:8080
 | POST | `/api/result` | player | `{ round, t, missed }`; first answer wins |
 | POST | `/api/host/login` | host | checks the password |
 | GET | `/api/host/players` | host | everyone in the current game |
-| POST | `/api/host/action` | host | `{ action: new / start / end / reveal / publish, round?, expect }` |
+| POST | `/api/host/action` | host | `{ action: new / rules / start / end / reveal / publish, round?, expect }` |
 
 Player calls send `x-player-id` and `x-player-token`; host calls send `x-host-key`.
 

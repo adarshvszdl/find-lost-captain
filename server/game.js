@@ -78,7 +78,7 @@ const cleanName = s => String(s || "").replace(/[\u0000-\u001f\u007f]/g, "").rep
 const newToken = () => crypto.randomBytes(18).toString("base64url");
 const strip = p => { if (!p) return null; const { token, ...rest } = p; return rest; };
 
-export function createGame({ games, players, cache, introMs = 10000 }) {
+export function createGame({ games, players, cache }) {
   // id -> { token, gameId } for players this server copy has already verified (saves a read per request)
   const known = new Map();
   const sameToken = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -129,7 +129,8 @@ export function createGame({ games, players, cache, introMs = 10000 }) {
   function roundOpen(g, idx) {
     if (!g) return false;
     if (g.phase === "round" && g.round === idx) return true;
-    return (g.phase === "between" || g.phase === "results") && g.round === idx && g.endedAt && Date.now() - g.endedAt < RESULT_GRACE_MS;
+    const late = g.endedAt && Date.now() - g.endedAt < RESULT_GRACE_MS;   // a save still in flight when the host moved on
+    return !!late && (((g.phase === "between" || g.phase === "results") && g.round === idx) || (g.phase === "rules" && g.round === idx + 1));
   }
   async function submitResult(id, token, { round, t, missed }) {
     let p = await auth(id, token);
@@ -163,10 +164,14 @@ export function createGame({ games, players, cache, introMs = 10000 }) {
     if (action === "new") {
       await games.replaceOne({ _id: GAME_ID }, { _id: GAME_ID, gameId: crypto.randomBytes(5).toString("hex"), phase: "lobby", round: 0, createdAt: now, version: ver + 1 }, { upsert: true });
     } else {
-      if (action === "start") {
+      if (action === "rules") {   // show the next challenge's rules; players wait until "start"
         const i = Number(round);
         if (!Number.isInteger(i) || i < 0 || i >= ROUNDS.length) throw new HttpError(400, "Unknown round");
-        set = { phase: "round", round: i, roundStartedAt: now, introMs, endedAt: null };
+        set = { phase: "rules", round: i };
+      } else if (action === "start") {
+        const i = Number(round);
+        if (!Number.isInteger(i) || i < 0 || i >= ROUNDS.length) throw new HttpError(400, "Unknown round");
+        set = { phase: "round", round: i, roundStartedAt: now, endedAt: null };
       } else if (action === "end") {
         if (cur.phase !== "round") throw new HttpError(409, "No challenge is running", { state: publicState(cur) });
         if (cur.round === ROUNDS.length - 1) {

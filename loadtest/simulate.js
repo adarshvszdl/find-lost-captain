@@ -113,6 +113,7 @@ const hostPoll = setInterval(() => call("host/players", BASES[0], "GET", "/api/h
 const all = Array.from({ length: N }, (_, i) => player(i, ctl));
 await sleep(RAMP + 3000);
 for (let r = 0; r < ROUND_KEYS.length; r++) {
+  await hostAction("rules", { round: r }); await sleep(2000);
   await hostAction("start", { round: r }); console.log(`  round ${r + 1} started (${((Date.now() - started) / 1000).toFixed(0)}s)`);
   await sleep(ROUND_MS);
   await hostAction("end");

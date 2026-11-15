@@ -12,14 +12,13 @@ const PORT = Number(process.env.PORT || 8080);
 const HOST_KEY = process.env.HOST_KEY || "";
 const DEV = process.argv.includes("--dev");   // npm run dev
 const POLL_MS = Number(process.env.POLL_MS || 500);
-const INTRO_SECONDS = Math.max(0, Number(process.env.INTRO_SECONDS ?? 10) || 0);   // rules countdown before each challenge
 if (!HOST_KEY || HOST_KEY.length < 8) { console.error("Set HOST_KEY (at least 8 characters): it is the first mate's password."); process.exit(1); }
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL || "info" }, disableRequestLogging: true, bodyLimit: 4096, trustProxy: true, forceCloseConnections: true });
 const { client, games, players } = await connectDb({ uri: process.env.MONGODB_URI, dbName: process.env.MONGODB_DB, poolSize: Number(process.env.MONGO_POOL || 40) });
 const cache = createGameCache({ games, players, pollMs: POLL_MS, log: app.log });
 await cache.refresh();
-const game = createGame({ games, players, cache, introMs: Math.round(INTRO_SECONDS * 1000) });
+const game = createGame({ games, players, cache });
 
 const hostOk = req => {
   const k = String(req.headers["x-host-key"] || "");
