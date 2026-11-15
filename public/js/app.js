@@ -27,7 +27,10 @@ const FINAL = ROUNDS.length - 1;
 // Only pirates who won all four islands hold all nine pieces, so only they can assemble the portrait.
 const canAssemble = () => earnedRows(FINAL - 1).length === ALL_ROWS.length;
 const assembledIt = () => { const res = G && myResult(ROUNDS[FINAL].key); return !!(res && !res.missed); };
-const seesCaptain = () => !!(G && G.captain) || assembledIt();
+// The face stays hidden behind the big reveal; it shows on the page underneath only once that screen's reveal is closed.
+const capKey = mode => "llc2:" + (G && G.gameId) + ":capClosed:" + mode;
+const capDone = mode => !!(G && G.captain && (capClosed[capKey(mode)] || lsGet(capKey(mode))));
+const seesCaptain = () => assembledIt() || capDone("player");
 function roundEnded(i) {
   if (!G || G.phase === "lobby") return false;
   return i < G.round || (i === G.round && (G.phase === "between" || G.phase === "results"));
@@ -283,7 +286,7 @@ const capClosed = {};
 function syncCaptainReveal() {
   const on = !!(G && G.phase === "results" && G.captain), gid = on ? G.gameId : "";
   const hostMode = isHost && viewAs !== "player", mode = hostMode ? "host" : "player";
-  const closedKey = "llc2:" + gid + ":capClosed:" + mode;
+  const closedKey = capKey(mode);
   let el = document.getElementById("cap-reveal");
   if (!on || capClosed[closedKey] || lsGet(closedKey)) { if (el) el.remove(); return; }
   const me = myRank;
@@ -298,7 +301,7 @@ function syncCaptainReveal() {
   const cover = portrait(gid, ALL_ROWS, false);
   cover.classList.add("cap-cover");
   cover.querySelectorAll("svg > g").forEach((g, i) => { g.style.animationDelay = delay(i); });
-  const close = () => { capClosed[closedKey] = true; lsSet(closedKey, 1); el.classList.add("out"); setTimeout(() => el.remove(), 500); };
+  const close = () => { capClosed[closedKey] = true; lsSet(closedKey, 1); el.classList.add("out"); setTimeout(() => el.remove(), 500); currentKey = ""; render(); };
   el = h("div", { id: "cap-reveal", class: "overlay cap-reveal" + (seen ? " done" : ""), role: "dialog", "aria-label": "The lost captain is revealed" },
     h("div", { class: "rays on" }),
     h("div", { class: "cap-kicker", text: "Our long-lost captain is…" }),
@@ -594,7 +597,7 @@ function hostStage(rows, enter, errP) {
       h("div", { class: "place", text: ordinal(place) }), h("div", { class: "pn", text: vis ? p.name : p ? "?" : "—" }), h("div", { class: "pt", text: vis ? fmt(p.total) : "" })); };
   // Order: reveal 3rd, 2nd, 1st → publish the winners → the big captain reveal on every screen.
   const shownCaptain = !!G.captain;
-  const reopen = () => { const k = "llc2:" + G.gameId + ":capClosed:host"; delete capClosed[k]; lsSet(k, ""); syncCaptainReveal(); };
+  const reopen = () => { const k = capKey("host"); delete capClosed[k]; lsSet(k, ""); render(); };
   const step = nextPlace > 0 ? h("button", { class: "gbtn big", disabled: hostBusy, onclick: revealNext }, nextPlace === 1 ? "Reveal the winner" : "Reveal " + ordinal(nextPlace) + " place")
     : !G.published ? h("button", { class: "gbtn green big", disabled: hostBusy, onclick: publishResults }, "Publish the winners to players")
     : !shownCaptain ? h("button", { class: "gbtn coral big", disabled: hostBusy, onclick: revealCaptain }, "Reveal the lost captain!")
@@ -603,7 +606,7 @@ function hostStage(rows, enter, errP) {
     : !shownCaptain ? "Players can see the standings. Now for the big moment: the captain's face, on every screen at once."
     : "The captain is revealed on every screen. Over to you, Captain!";
   return [sheet(shownCaptain ? "The captain is found!" : "Voyage complete!", [
-    h("div", { class: "results-grid" }, portrait(G.gameId, ALL_ROWS, shownCaptain), h("div", { class: "podium" }, plinth(2), plinth(1), plinth(3))),
+    h("div", { class: "results-grid" }, portrait(G.gameId, ALL_ROWS, capDone("host")), h("div", { class: "podium" }, plinth(2), plinth(1), plinth(3))),
     h("div", { class: "row" }, step, G.published ? liveChip("Winners published") : null),
     h("p", { class: "muted small", text: note }), errP],
     { wide: true, color: "green", enter })];
