@@ -148,9 +148,13 @@ export function createGame({ games, players, cache }) {
     if (missed) time = missFor(R);
     if (!Number.isFinite(time) || time <= 0 || time > missFor(R)) throw new HttpError(400, "Invalid time");
     // first answer wins: a retry or a second tab never overwrites a saved time
-    const r = await players.updateOne({ _id: p._id, ["times." + round]: { $exists: false } }, { $set: { ["times." + round]: time, ["missed." + round]: !!missed } });
+    const filter = { _id: p._id, ["times." + round]: { $exists: false } };
+    // the portrait needs all nine pieces: only pirates who won every earlier island may submit it
+    if (idx === ROUNDS.length - 1) for (const E of ROUNDS.slice(0, -1)) filter["missed." + E.key] = false;
+    const r = await players.updateOne(filter, { $set: { ["times." + round]: time, ["missed." + round]: !!missed } });
     if (r.modifiedCount) return { saved: { round, t: time, missed: !!missed } };
     const fresh = await players.findOne({ _id: p._id }, { projection: { times: 1, missed: 1 } });
+    if (!fresh.times || fresh.times[round] == null) throw new HttpError(409, "You need all nine portrait pieces for the final challenge");
     return { saved: { round, t: fresh.times[round], missed: !!(fresh.missed && fresh.missed[round]) } };
   }
 
@@ -183,8 +187,11 @@ export function createGame({ games, players, cache }) {
         } else set = { phase: "between", endedAt: now };
       } else if (action === "reveal") {
         set = { reveal: Math.min(Math.min(3, (cur.top || []).length), (cur.reveal || 0) + 1) };
+      } else if (action === "captain") {   // show the captain's face on every player's screen
+        if (cur.phase !== "results") throw new HttpError(409, "The results aren't in yet", { state: publicState(cur) });
+        set = { captain: true };
       } else if (action === "publish") {
-        set = { reveal: Math.min(3, (cur.top || []).length), published: true };
+        set = { reveal: Math.min(3, (cur.top || []).length), published: true, captain: true };
       } else throw new HttpError(400, "Unknown action");
       const r = await games.updateOne({ _id: GAME_ID, version: ver }, { $set: set, $inc: { version: 1 } });
       if (!r.matchedCount) throw new HttpError(409, "The game changed at the same moment; try again", { state: publicState(await games.findOne({ _id: GAME_ID })) });

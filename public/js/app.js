@@ -10,6 +10,7 @@ let players = [];
 let viewAs = "auto";
 let joinErr = "", writeErr = "", confirmReset = false, hostBusy = false, toolsOpen = false, keyOpen = false;
 const submitted = {};
+let hostCaptainSeen = "";
 let currentKey = "", cleanups = [], hostScreenKey = "", hostTimerIv = null, clockSkew = 0;
 const serverTime = () => Date.now() + clockSkew;
 
@@ -23,6 +24,11 @@ function myResult(rk) {
 function earnedRows(upto) {
   return ALL_ROWS.filter(i => { if (i > upto) return false; const res = myResult(ROUNDS[i].key); return res && !res.missed; });
 }
+const FINAL = ROUNDS.length - 1;
+// Only pirates who won all four islands hold all nine pieces, so only they can assemble the portrait.
+const canAssemble = () => earnedRows(FINAL - 1).length === ALL_ROWS.length;
+const assembledIt = () => { const res = G && myResult(ROUNDS[FINAL].key); return !!(res && !res.missed); };
+const seesCaptain = () => !!(G && (G.captain || G.published)) || assembledIt();
 function roundEnded(i) {
   if (!G || G.phase === "lobby") return false;
   return i < G.round || (i === G.round && (G.phase === "between" || G.phase === "results"));
@@ -183,10 +189,11 @@ function playerKey() {
   if (!joined()) return "join:" + G.gameId + ":" + joinErr + tag;
   const r = G.round, rk = ROUNDS[r] && ROUNDS[r].key;
   if (G.phase === "lobby") return "lobby:" + G.gameId + tag;
+  if ((G.phase === "rules" || G.phase === "round") && r === FINAL && !canAssemble()) return "locked:" + G.gameId + tag;
   if (G.phase === "rules") return "rules:" + G.gameId + ":" + r + tag;
   if (G.phase === "round" && !myResult(rk)) return "play:" + G.gameId + ":" + r + tag;
   if (G.phase === "round" || G.phase === "between") return "after:" + G.gameId + ":" + r + ":" + !!myResult(rk) + tag;
-  if (G.phase === "results") return "results:" + G.gameId + ":" + (G.resultsAt || 0) + ":" + !!G.published + tag;
+  if (G.phase === "results") return "results:" + G.gameId + ":" + (G.resultsAt || 0) + ":" + !!G.published + ":" + seesCaptain() + tag;
   return "unknown" + tag;
 }
 function renderPlayer() {
@@ -195,6 +202,7 @@ function renderPlayer() {
   if (!joined()) return renderJoin();
   const r = G.round, R = ROUNDS[r];
   if (G.phase === "lobby") return renderLobby();
+  if ((G.phase === "rules" || G.phase === "round") && r === FINAL && !canAssemble()) return renderLocked();
   if (G.phase === "rules") return renderRules(r);
   if (G.phase === "round" && !myResult(R.key)) return renderPlay(r);
   if (G.phase === "round" || G.phase === "between") return renderAfter(r);
@@ -253,6 +261,27 @@ function renderRules(r) {
   ], { color: "navy", enter: true })));
 }
 
+/* The final challenge for a pirate who lost an island: no full set of pieces, so they wait for the reveal. */
+function renderLocked() {
+  const won = earnedRows(FINAL - 1), have = piecesUpTo(won), lost = ALL_ROWS.length - won.length;
+  World.set({ visible: 4, cleared: 4, focus: 4, zoom: "fit", follow: false });
+  World.sail(FINAL, FINAL + 1, G.gameId + ":arrive:" + FINAL);
+  return screen(playerHud(have), grow(), dock(sheet("Out of the race", [
+    h("div", { class: "res-grid" }, portrait(G.gameId, won, false),
+      h("div", { style: "display:grid;gap:8px" },
+        h("div", { class: "label", text: "Portrait pieces" }), h("div", { class: "big-time", text: have + " of " + GRID * GRID }),
+        h("p", { class: "strong", text: "You lost " + (lost === 1 ? "an island" : lost + " islands") + " on the way, so you can't assemble the captain's portrait." }),
+        h("p", { class: "muted small", text: "Stay on this screen. The first mate will reveal the winners and the captain's face soon." }))),
+  ], { color: "navy", enter: true })));
+}
+/* The portrait at the results: face-down until the first mate reveals the captain (or you assembled it yourself). */
+function resultsPortrait() {
+  if (!seesCaptain()) return portrait(G.gameId, ALL_ROWS, false);
+  const el = portrait(G.gameId, ALL_ROWS, true), k = "llc2:" + G.gameId + ":captainSeen";
+  if (!assembledIt() && !lsGet(k)) { el.classList.add("unveil"); lsSet(k, 1); }
+  return el;
+}
+
 function renderPlay(r) {
   const R = ROUNDS[r], gid = G.gameId, cap = capFor(R);
   const lsKey = "llc2:" + gid + ":" + R.key;
@@ -305,7 +334,8 @@ function renderAfter(r) {
   const seqKey = "llc2:" + gid + ":" + R.key + ":seq", seen = !!lsGet(seqKey);
   lsSet(seqKey, 1);
   const finalText = r === 3
-    ? (won ? "All four islands conquered! The ship drops anchor at Captain's Cove. Wait for the first mate's order to assemble the portrait." : "Lockdown Island is behind us. The ship drops anchor at Captain's Cove. Wait for the first mate's order to assemble the portrait.")
+    ? (canAssemble() ? "All four islands conquered! The ship drops anchor at Captain's Cove. Wait for the first mate's order to assemble the portrait."
+      : "The ship drops anchor at Captain's Cove. You lost an island on the way, so you can't assemble the portrait. Watch the first mate's screen for the big reveal.")
     : (won ? "Land ho! We've reached " + nextName + ". Rest here until the first mate starts the next challenge." : "No treasure this time, but the voyage goes on. We've reached " + nextName + ". Wait for the first mate's order.");
   const stat = res ? (res.missed ? "Time ran out: counts as " + fmt(res.t) : R.title + " in " + fmt(res.t)) : "Not finished: counts as " + fmt(missFor(R));
   const hud = playerHud(seen ? after : before);
@@ -388,11 +418,12 @@ function renderPlayerResults() {
   World.place(5); World.set({ visible: 4, cleared: 5, focus: 4, zoom: "fit", follow: false });
   const hud = playerHud(piecesUpTo(earnedRows(3)));
   if (!G.published) return screen(hud, grow(), dock(sheet("Voyage complete", [
-    h("div", { class: "res-grid" }, portrait(G.gameId, ALL_ROWS, true),
+    h("div", { class: "res-grid" }, resultsPortrait(),
       h("div", { style: "display:grid;gap:8px" }, h("div", { class: "label", text: "Your total time" }), h("div", { class: "big-time", text: me ? fmt(me.total) : "—" }),
-        h("p", { class: "strong", text: "Watch the first mate's screen: the winners are about to be revealed!" }))),
+        h("p", { class: "strong", text: seesCaptain() ? "Watch the first mate's screen: the winners are about to be revealed!" : "Watch the first mate's screen: the winners and the captain's face are about to be revealed!" }))),
   ], { color: "green", enter: true })));
   return screen(hud, grow(), dock(sheet("Final standings", [
+    assembledIt() ? null : h("div", { style: "width:min(170px,60%);margin:0 auto" }, resultsPortrait()),
     me ? h("div", { style: "display:grid;gap:8px;justify-items:center;text-align:center" }, h("div", { class: "label", text: "You finished" }), h("div", { class: "medal-big", text: ordinal(me.rank) }),
       h("p", { class: "strong" }, "of " + G.totalPlayers + " pirates · total ", h("span", { style: "font-family:var(--f-display);font-weight:400;font-size:1.2rem", text: fmt(me.total) })))
       : h("p", { class: "muted", text: "You joined after the results were counted." }),
@@ -437,6 +468,8 @@ function endRound() { return hostWrite("end"); }
 const podiumSize = () => Math.min(3, (G.top || []).length);
 function revealNext() { return hostWrite("reveal"); }
 function publishResults() { return hostWrite("publish"); }
+function revealCaptain() { return hostWrite("captain"); }
+const holdsAllPieces = p => ALL_ROWS.every(i => { const k = ROUNDS[i].key; return p.times && p.times[k] != null && !(p.missed && p.missed[k]); });
 
 function hostWorld() {
   const r = G.round, gid = G.gameId;
@@ -493,6 +526,7 @@ function hostStage(rows, enter, errP) {
   if (G.phase === "rules") return [sheet(R.title, [
     h("div", { class: "sheet-head" }, h("div", { class: "sub", text: R.type === "puzzle" ? "Final challenge" : "Island " + (r + 1) + " of 4" }), liveChip("Rules on screen")),
     h("ul", { class: "rules" }, [...R.rules, "Time limit: " + capText(R) + "."].map(t => h("li", { text: t }))),
+    R.type === "puzzle" ? h("p", { class: "strong", text: players.filter(holdsAllPieces).length + " of " + n + " pirates won every island and can assemble the portrait. The rest wait for the reveal." }) : null,
     h("p", { class: "muted small", text: "Players are reading these rules now. Start when the crew is ready; each player's clock starts when the challenge appears on their screen." }),
     h("button", { class: "gbtn green big", disabled: hostBusy, onclick: () => startRound(r) }, R.type === "puzzle" ? "Start the final challenge" : "Start the challenge"), errP], { color: "navy", enter })];
   if (G.phase === "round") {
@@ -504,7 +538,7 @@ function hostStage(rows, enter, errP) {
       h("div", { class: "sheet-head" }, h("div", { class: "sub", text: R.type === "puzzle" ? "Final challenge" : "Island " + (r + 1) + " of 4" }), liveChip("Live")),
       timer,
       h("div", { class: "bar-track" }, h("div", { class: "bar-fill", style: "width:" + (n ? done / n * 100 : 0) + "%" })),
-      h("p", { class: "strong", text: done + " of " + n + " pirates finished" }),
+      h("p", { class: "strong", text: R.type === "puzzle" ? done + " of " + players.filter(holdsAllPieces).length + " pirates with all 9 pieces finished" : done + " of " + n + " pirates finished" }),
       h("p", { class: "muted small", text: R.rules.join(" ") }),
       h("p", { class: "muted small", text: "Each player's clock starts when the challenge appears on their screen. Anyone still playing when you end it gets " + fmt(missFor(R)) + "." }),
       h("button", { class: "gbtn coral big", disabled: hostBusy, onclick: endRound }, R.type === "puzzle" ? "End game & count results" : "End this challenge"), errP], { enter })];
@@ -522,13 +556,21 @@ function hostStage(rows, enter, errP) {
   const plinth = place => { const p = top[place - 1], vis = p && place > size - shown;
     return h("div", { class: "plinth p" + place + (vis ? "" : " hidden") + (vis && enter && place === size - shown + 1 ? " new" : "") },
       h("div", { class: "place", text: ordinal(place) }), h("div", { class: "pn", text: vis ? p.name : p ? "?" : "—" }), h("div", { class: "pt", text: vis ? fmt(p.total) : "" })); };
-  return [sheet("The captain is found!", [
-    h("div", { class: "results-grid" }, portrait(G.gameId, ALL_ROWS, true), h("div", { class: "podium" }, plinth(2), plinth(1), plinth(3))),
+  const shownCaptain = !!(G.captain || G.published);
+  // The shared screen keeps the portrait face-down until the first mate reveals the captain.
+  function hostPortrait() {
+    const el = portrait(G.gameId, ALL_ROWS, shownCaptain);
+    if (shownCaptain && hostCaptainSeen !== G.gameId) { el.classList.add("unveil"); hostCaptainSeen = G.gameId; }
+    return el;
+  }
+  return [sheet(shownCaptain ? "The captain is found!" : "Voyage complete!", [
+    h("div", { class: "results-grid" }, hostPortrait(), h("div", { class: "podium" }, plinth(2), plinth(1), plinth(3))),
     h("div", { class: "row" },
-      nextPlace > 0 ? h("button", { class: "gbtn big", disabled: hostBusy, onclick: revealNext }, nextPlace === 1 ? "Reveal the winner" : "Reveal " + ordinal(nextPlace) + " place") : null,
+      nextPlace > 0 ? h("button", { class: "gbtn big", disabled: hostBusy, onclick: revealNext }, nextPlace === 1 ? "Reveal the winner" : "Reveal " + ordinal(nextPlace) + " place")
+        : !shownCaptain ? h("button", { class: "gbtn big", disabled: hostBusy, onclick: revealCaptain }, "Reveal the captain to everyone") : null,
       G.published ? liveChip("Results published to players")
         : h("button", { class: "gbtn green" + (nextPlace > 0 ? "" : " big"), disabled: hostBusy, onclick: publishResults }, "Publish results to players")),
-    h("p", { class: "muted small", text: G.published ? "Every player can now see their own place and the top 10. Over to you, Captain!" : "Players see only their own total until you publish." }), errP],
+    h("p", { class: "muted small", text: G.published ? "Every player can now see their own place and the top 10. Over to you, Captain!" : (shownCaptain ? "The captain's face is on every player's screen. " : "Players who didn't assemble the portrait haven't seen the captain yet. ") + "Players see only their own total until you publish." }), errP],
     { wide: true, color: "green", enter })];
 }
 boot();

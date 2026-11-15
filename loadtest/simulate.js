@@ -71,7 +71,7 @@ async function hostAction(action, extra) {
 const playersOut = [];
 async function player(i, ctl) {
   const base = BASES[i % BASES.length];
-  const me = { i, base, id: null, token: null, submitted: {}, seen: new Set(), rank: null };
+  const me = { i, base, id: null, token: null, submitted: {}, won: {}, seen: new Set(), rank: null };
   playersOut.push(me);
   await sleep(rand(0, RAMP));
   for (const f of ["/", "/js/core.js", "/js/app.js", "/captain.jpg"]) await call("page load", base, "GET", f);
@@ -85,13 +85,15 @@ async function player(i, ctl) {
       const rk = ROUND_KEYS[s.round];
       if (!(rk in me.submitted) && !me["sched" + rk]) {
         me["sched" + rk] = true;
-        const skip = Math.random() < .08;                    // ~8% never finish a round
+        // the portrait is only open to pirates who won all four islands
+        const locked = rk === "r5" && !["r1", "r2", "r3", "r4"].every(k => me.won[k]);
+        const skip = locked || Math.random() < .08;                    // ~8% never finish a round
         const missed = !skip && Math.random() < .05;          // ~5% run out of time
         const delay = rand(1500, Math.min(ROUND_MS - 2000, 18000));
         if (!skip) setTimeout(async () => {
           const t = Math.round(rand(4000, 85000));
           const r = await call("result", base, "POST", "/api/result", { round: rk, t, missed }, { "x-player-id": me.id, "x-player-token": me.token });
-          if (r.ok) me.submitted[rk] = r.data.saved.t;
+          if (r.ok) { me.submitted[rk] = r.data.saved.t; me.won[rk] = !r.data.saved.missed; }
         }, delay);
       }
     }
@@ -120,6 +122,7 @@ for (let r = 0; r < ROUND_KEYS.length; r++) {
   await sleep(BETWEEN_MS);
 }
 for (let k = 0; k < 3; k++) { await hostAction("reveal"); await sleep(800); }
+await hostAction("captain"); await sleep(800);
 await hostAction("publish");
 await sleep(5000);
 clearInterval(hostPoll);
