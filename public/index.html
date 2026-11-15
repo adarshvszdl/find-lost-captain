@@ -104,7 +104,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px 
 .hud { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .chip { display: inline-flex; align-items: center; gap: 8px; background: rgba(31,45,77,.92); color: var(--white); border: 3px solid var(--white); border-radius: 999px;
   padding: 4px 14px 4px 5px; font-weight: 800; font-size: .95rem; box-shadow: 0 4px 0 rgba(31,45,77,.35); max-width: 100%; }
-.chip .dot { width: 26px; height: 26px; flex: none; border-radius: 50%; background: var(--sun); color: var(--navy); display: grid; place-items: center; font-family: var(--f-display); font-size: .95rem; border: 2px solid var(--navy); }
+.chip .dot { min-width: 26px; height: 26px; padding: 0 5px; flex: none; border-radius: 13px; background: var(--sun); color: var(--navy); display: grid; place-items: center; font-family: var(--f-display); font-size: .95rem; border: 2px solid var(--navy); }
 .chip.live .dot { animation: pulse 1.2s ease-in-out infinite; }
 .chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 12ch; }
 .chip.bump { animation: bump .5s cubic-bezier(.2, 2, .4, 1); }
@@ -279,7 +279,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px 
 .nm-chip { background: var(--white); border: 2px solid var(--navy); border-radius: 999px; padding: 2px 10px; font-weight: 800; font-size: .9rem; }
 .ledger { width: 100%; border-collapse: collapse; font-size: .98rem; }
 .ledger td { padding: 6px 4px; border-bottom: 2px dashed #e6d5ad; font-weight: 700; }
-.ledger td.r { text-align: right; font-family: var(--f-display); font-weight: 400; font-variant-numeric: tabular-nums; }
+.ledger td.r { padding-right: 14px; text-align: right; font-family: var(--f-display); font-weight: 400; font-variant-numeric: tabular-nums; }
 .ledger .nm { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ledger .tick { color: var(--leaf-dk); font-weight: 900; }
 .medal { width: 28px; height: 28px; border-radius: 50%; display: inline-grid; place-items: center; font-family: var(--f-display); font-size: .95rem; border: 2px solid var(--navy); background: var(--white); }
