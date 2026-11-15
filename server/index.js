@@ -9,6 +9,7 @@ import { createGameCache, createGame, HttpError } from "./game.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
 const HOST_KEY = process.env.HOST_KEY || "";
+const DEV = process.argv.includes("--dev");   // npm run dev
 const POLL_MS = Number(process.env.POLL_MS || 500);
 const INTRO_SECONDS = Math.max(0, Number(process.env.INTRO_SECONDS ?? 10) || 0);   // rules countdown before each challenge
 if (!HOST_KEY || HOST_KEY.length < 8) { console.error("Set HOST_KEY (at least 8 characters): it is the first mate's password."); process.exit(1); }
@@ -69,7 +70,8 @@ app.post("/api/host/action", async req => { requireHost(req); return game.hostAc
 /* ---------- the game page ---------- */
 await app.register(fastifyStatic, {
   root: path.join(__dirname, "..", "public"),
-  setHeaders(res, file) { res.setHeader("cache-control", /\.(html)$/.test(file) ? "no-cache" : "public, max-age=3600"); },
+  // In dev mode (npm run dev) browsers re-check every file, so a normal refresh shows edits.
+  setHeaders(res, file) { res.setHeader("cache-control", DEV || /\.(html)$/.test(file) ? "no-cache" : "public, max-age=3600"); },
 });
 
 const shutdown = async sig => {
