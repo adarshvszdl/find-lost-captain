@@ -224,6 +224,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px 
 .cap-close { animation: fadeIn .6s 4.8s both; }
 .cap-reveal.done *, .cap-reveal.done { animation: none !important; }
 .cap-reveal.done .cap-cover { display: none; }
+.cap-reveal > :not(.rays) { position: relative; z-index: 1; }   /* keep the rays behind the captain even when the animations are off (.done) */
 @keyframes fresh { 35% { stroke: var(--white); stroke-width: 10px; } }
 
 /* Cinematics */
@@ -231,6 +232,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px 
   padding: max(20px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   background: radial-gradient(circle at 50% 45%, rgba(31,45,77,.5), rgba(14,22,42,.9)); animation: fadeIn .35s both; color: var(--white); }
 .overlay.out { opacity: 0; transition: opacity .5s; }
+.overlay.cap-reveal { background: radial-gradient(circle at 50% 45%, rgba(24,35,62,.86), rgba(8,13,28,.97)); }   /* darker: the map barely shows behind the captain */
 @keyframes fadeIn { from { opacity: 0; } }
 .rays { position: absolute; left: 50%; top: 44%; width: 1000px; height: 1000px; margin: -500px 0 0 -500px; pointer-events: none;
   background: repeating-conic-gradient(rgba(255,214,102,.32) 0 8deg, transparent 8deg 22deg);
