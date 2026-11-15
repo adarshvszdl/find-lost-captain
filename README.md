@@ -18,6 +18,7 @@ npm run local               # starts on http://localhost:8080
 - Players: `http://localhost:8080/`
 - First mate: `http://localhost:8080/#host` (asks for `HOST_KEY`)
 - Stage (view-only, for a projector or a slide): `http://localhost:8080/#stage`
+- Intro slides (present from any browser; the last slide is the live stage): `http://localhost:8080/slides`. ← → or a clicker to move, F for full screen.
 
 ## How a game runs
 

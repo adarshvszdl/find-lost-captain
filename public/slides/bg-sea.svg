@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" stroke="#ffffff" stroke-opacity=".13" stroke-width="5" stroke-linecap="round">
+<defs><path id="w" d="M0 0 q14 -12 28 0 q14 -12 28 0"/></defs>
+<use href="#w" x="140" y="120"/><use href="#w" x="520" y="260"/><use href="#w" x="1500" y="90"/><use href="#w" x="1760" y="330"/>
+<use href="#w" x="300" y="560"/><use href="#w" x="980" y="200"/><use href="#w" x="1240" y="520"/><use href="#w" x="90" y="900"/>
+<use href="#w" x="700" y="980"/><use href="#w" x="1620" y="840"/><use href="#w" x="1100" y="760"/><use href="#w" x="420" y="760"/>
+</svg>

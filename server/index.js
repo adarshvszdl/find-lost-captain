@@ -99,6 +99,8 @@ function pageHtml() {
 const sendPage = (req, reply) => reply.header("cache-control", "no-cache").type("text/html; charset=utf-8").send(pageHtml());
 app.get("/", sendPage);
 app.get("/index.html", sendPage);
+// The intro slides (/slides): presented from any browser, ending on the live stage.
+app.get("/slides", (req, reply) => reply.header("cache-control", "no-cache").type("text/html; charset=utf-8").send(fs.readFileSync(path.join(PUBLIC_DIR, "slides.html"))));
 
 await app.register(fastifyStatic, {
   index: false,
