@@ -598,11 +598,58 @@ const World = (() => {
     ctx.quadraticCurveTo(r + b, my, r - 2, y1); ctx.quadraticCurveTo(x + b * .3, y1 + b * .5, l + 2, y1);
     ctx.quadraticCurveTo(l + b * .55, my, l, y0); ctx.closePath();
   }
-  function drawSail(x, y0, y1, w, b) {
+  // The H&R Block logo, printed on the main sail. It is bent onto the sail's billow with a triangle mesh,
+  // so the square follows the cloth; the sail's shading and seams are then laid over it like printed fabric.
+  const LOGO = new Image(); let logoReady = false;
+  LOGO.onload = () => { logoReady = true; };
+  LOGO.src = "/hrblock.png";
+  const logoCache = new Map();
+  function texTri(c, img, s, d) {   // draw triangle s (image px) of img onto triangle d (canvas units)
+    // clip to the triangle grown by a hair so neighbours overlap (no seams); the mapping itself uses the exact corners
+    const cx = (d[0][0] + d[1][0] + d[2][0]) / 3, cy = (d[0][1] + d[1][1] + d[2][1]) / 3;
+    const g = d.map(([px, py]) => { const dx = px - cx, dy = py - cy, k = Math.hypot(dx, dy) || 1; return [px + dx / k * .12, py + dy / k * .12]; });
+    c.save(); c.beginPath(); c.moveTo(g[0][0], g[0][1]); c.lineTo(g[1][0], g[1][1]); c.lineTo(g[2][0], g[2][1]); c.closePath(); c.clip();
+    const [[x0, y0], [x1, y1], [x2, y2]] = s, [[u0, v0], [u1, v1], [u2, v2]] = d;
+    const den = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0); if (!den) { c.restore(); return; }
+    const a = ((u1 - u0) * (y2 - y0) - (u2 - u0) * (y1 - y0)) / den, cc = ((u2 - u0) * (x1 - x0) - (u1 - u0) * (x2 - x0)) / den;
+    const bb = ((v1 - v0) * (y2 - y0) - (v2 - v0) * (y1 - y0)) / den, dd = ((v2 - v0) * (x1 - x0) - (v1 - v0) * (x2 - x0)) / den;
+    c.transform(a, bb, cc, dd, u0 - a * x0 - cc * y0, v0 - bb * x0 - dd * y0); c.drawImage(img, 0, 0); c.restore();
+  }
+  function logoPrint(x, y0, y1, w, b, mirror) {   // cached: one bitmap per billow strength and facing
+    const key = b + ":" + mirror; if (logoCache.has(key)) return logoCache.get(key);
+    const S = 8, X0 = x - w / 2 - 3, Y0 = y0 - 8, W = w + b + 6, H = y1 - y0 + b * .5 + 12;
+    const cv = document.createElement("canvas"); cv.width = Math.ceil(W * S); cv.height = Math.ceil(H * S);
+    const c = cv.getContext("2d"); c.setTransform(S, 0, 0, S, -X0 * S, -Y0 * S);
+    // Where point (u, v) of the flat sail lands on the billowed sail: the top yard sags slightly, the hem bellies
+    // down, and the leech bulges out further than the luff, exactly as sailShape draws the edges.
+    const l = x - w / 2;
+    const at = (u, v) => { const k = 2 * v * (1 - v), top = y0 - 8 * u * (1 - u), bot = y1 + b * u * (1 - u);
+      return [l + k * .55 * b + u * (w + k * .45 * b), top + v * (bot - top)]; };
+    // The square sits in the part of the sail that the fore course and mizzen never cover, either way the ship faces.
+    const U0 = .12, U1 = .69, V0 = .235, V1 = .765;
+    const iw = LOGO.naturalWidth, ih = LOGO.naturalHeight, N = 16;
+    const src = (u, v) => [(mirror ? 1 - u : u) * iw, v * ih];
+    const D = (u, v) => at(U0 + u * (U1 - U0), V0 + v * (V1 - V0));
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const u0 = i / N, u1 = (i + 1) / N, v0 = j / N, v1 = (j + 1) / N;
+      texTri(c, LOGO, [src(u0, v0), src(u1, v0), src(u1, v1)], [D(u0, v0), D(u1, v0), D(u1, v1)]);
+      texTri(c, LOGO, [src(u0, v0), src(u1, v1), src(u0, v1)], [D(u0, v0), D(u1, v1), D(u0, v1)]);
+    }
+    const out = { cv, X0, Y0, W, H }; logoCache.set(key, out); return out;
+  }
+  // mirror: undefined for a plain sail; true/false prints the logo (true when the ship is drawn flipped, so it still reads)
+  function drawSail(x, y0, y1, w, b, mirror) {
     sailShape(x, y0, y1, w, b);
     const g = ctx.createLinearGradient(x - w / 2, 0, x + w / 2 + b, 0); g.addColorStop(0, "#eadcb8"); g.addColorStop(.45, "#fffaf0"); g.addColorStop(1, "#dccaa0");
     ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "#1f2d4d"; ctx.lineWidth = 3; ctx.stroke();
     ctx.save(); sailShape(x, y0, y1, w, b); ctx.clip();
+    if (mirror !== undefined && logoReady) {
+      const P = logoPrint(x, y0, y1, w, b, mirror); ctx.drawImage(P.cv, P.X0, P.Y0, P.W, P.H);
+      // the same light and shadow as the cloth around it, laid over the print
+      const sg = ctx.createLinearGradient(x - w / 2, 0, x + w / 2 + b, 0);
+      sg.addColorStop(0, "rgba(70,45,10,.20)"); sg.addColorStop(.45, "rgba(255,255,255,.10)"); sg.addColorStop(1, "rgba(70,45,10,.26)");
+      ctx.fillStyle = sg; ctx.fillRect(x - w / 2 - 4, y0 - 8, w + b + 8, y1 - y0 + b + 14);
+    }
     ctx.strokeStyle = "rgba(150,120,70,.35)"; ctx.lineWidth = 1.5;
     for (const k of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + k * w / 6, y0); ctx.quadraticCurveTo(x + k * w / 6 + b * .6, (y0 + y1) / 2, x + k * w / 6 + b * .2, y1); ctx.stroke(); }
     ctx.restore();
@@ -634,13 +681,9 @@ const World = (() => {
     // sails: mizzen, main (course + topsail), fore (course + topsail)
     drawSail(-36, -92, -50, 32, b);
     drawSail(6, -124, -98, 34, b * .8);
-    drawSail(6, -92, -40, 48, b);
+    drawSail(6, -92, -40, 48, b, face < 0);   // main course carries the H&R Block logo
     drawSail(42, -100, -76, 26, b * .8);
     drawSail(42, -72, -38, 36, b);
-    const ex = 6 + b * .3, ey = -67;
-    disc(ctx, ex, ey, 10.5, "#ff6b4a"); ctx.strokeStyle = "#1f2d4d"; ctx.lineWidth = 2.5; ctx.stroke();
-    disc(ctx, ex, ey - 1.5, 5, "#ffffff"); ctx.fillStyle = "#ffffff"; ctx.fillRect(ex - 3, ey + 1.5, 6, 4);
-    disc(ctx, ex - 2, ey - 2, 1.4, "#1f2d4d"); disc(ctx, ex + 2, ey - 2, 1.4, "#1f2d4d");
     // hull: raised stern castle, sweeping bow
     const hull = () => { ctx.beginPath(); ctx.moveTo(-66, -40); ctx.lineTo(-34, -40); ctx.lineTo(-30, -22); ctx.lineTo(58, -22);
       ctx.quadraticCurveTo(68, -24, 75, -37); ctx.quadraticCurveTo(75, -6, 50, 10); ctx.quadraticCurveTo(0, 20, -46, 14); ctx.quadraticCurveTo(-62, 8, -66, -40); ctx.closePath(); };
