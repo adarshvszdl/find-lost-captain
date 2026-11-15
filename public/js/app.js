@@ -73,17 +73,24 @@ function applyState(s) {
   if (G && G.phase === "results" && joined()) { const k = G.gameId + ":" + G.resultsAt; if (rankFor !== k) { rankFor = k; refreshRank(); } }
 }
 function connectStream() {
-  let lastMsg = 0;
+  let lastStream = 0, polling = false;
   if (window.EventSource) {
     const es = new EventSource("/api/stream");
-    es.addEventListener("state", e => { lastMsg = Date.now(); try { applyState(JSON.parse(e.data)); } catch {} render(); });
-    es.addEventListener("ping", () => { lastMsg = Date.now(); });
+    es.addEventListener("state", e => { lastStream = Date.now(); try { applyState(JSON.parse(e.data)); } catch {} render(); });
+    es.addEventListener("ping", () => { lastStream = Date.now(); });
   }
-  // Fallback for networks that block streaming: poll if the stream has been quiet for 20 s.
+  // Fallback for proxies that hold the stream back: while the stream has been silent for 20 s
+  // (it pings every 15 s when it works), fetch the state every 3 s so host clicks reach players quickly.
   setInterval(async () => {
-    if (Date.now() - lastMsg < 20000) return;
-    try { const s = await API.req("GET", "/api/state"); lastMsg = Date.now(); applyState(s); render(); } catch {}
-  }, 4000);
+    if (polling || Date.now() - lastStream < 20000) return;
+    polling = true;
+    try {
+      const s = await API.req("GET", "/api/state");
+      const changed = !gameLoaded || (s ? !G || s.gameId !== G.gameId || s.version !== G.version : G !== null);
+      if (changed) { applyState(s); render(); }   // re-render only when the state actually changed
+    } catch {}
+    polling = false;
+  }, 3000);
 }
 async function pollPlayers() {
   if (!isHost) return;
