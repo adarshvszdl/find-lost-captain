@@ -67,9 +67,11 @@ p { font-size: 32px; line-height: 1.4; }
 .link-panel .small { color: var(--foam); font-weight: 800; letter-spacing: 2px; }
 .link-panel .display { font-size: 96px; line-height: 1.05; color: var(--sun); overflow-wrap: anywhere; }
 
-/* The live stage, full bleed */
+/* The live stage. Its iframe sits outside the scaled canvas, sized to the slide's on-screen box, so the
+   stage draws at real screen size instead of 1920×1080 that is then shrunk every frame. */
 .live { padding: 0; background: var(--deep); }
-.live iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+#live-frame { position: fixed; border: 0; pointer-events: none; z-index: 1; background: var(--deep); }
+#live-frame[hidden] { display: none; }
 
 /* Arrival motion, replayed each time a slide is shown */
 @keyframes rise { from { opacity: 0; transform: translateY(40px); } }
@@ -182,11 +184,10 @@ p { font-size: 32px; line-height: 1.4; }
   </div>
 </section>
 
-<section class="slide live" aria-label="The voyage, live">
-  <iframe data-src="/#stage" title="The live voyage map" tabindex="-1"></iframe>
-</section>
+<section class="slide live" data-live="/#stage" aria-label="The voyage, live"></section>
 
 </div></div>
+<iframe id="live-frame" title="The live voyage map" tabindex="-1" hidden></iframe>
 <div class="chrome" id="count"></div>
 <div class="hint" id="hint">← → or click to move · F for full screen</div>
 <script>
@@ -194,14 +195,20 @@ p { font-size: 32px; line-height: 1.4; }
   const canvas = document.getElementById("canvas"), slides = [...canvas.querySelectorAll(".slide")], count = document.getElementById("count");
   // The join slide shows this site's own address, so it's always right wherever the game is deployed.
   document.getElementById("join-link").textContent = location.host;
-  const fit = () => canvas.style.transform = "translate(-50%, -50%) scale(" + Math.min(innerWidth / 1920, innerHeight / 1080) + ")";
-  addEventListener("resize", fit); fit();
+  const frame = document.getElementById("live-frame");
   let at = 0;
+  function fit() {
+    const k = Math.min(innerWidth / 1920, innerHeight / 1080), w = Math.round(1920 * k), h = Math.round(1080 * k);
+    canvas.style.transform = "translate(-50%, -50%) scale(" + k + ")";
+    Object.assign(frame.style, { width: w + "px", height: h + "px", left: Math.round((innerWidth - w) / 2) + "px", top: Math.round((innerHeight - h) / 2) + "px" });
+  }
+  addEventListener("resize", fit); fit();
   function show(n) {
     at = Math.max(0, Math.min(slides.length - 1, n));
     slides.forEach((s, k) => s.classList.toggle("active", k === at));
-    const f = slides[at].querySelector("iframe[data-src]");
-    if (f && !f.getAttribute("src")) f.src = f.dataset.src;   // the live stage loads when first shown
+    const live = slides[at].dataset.live;   // a live slide shows the stage iframe over its box; it loads when first shown, then stays loaded
+    if (live && frame.getAttribute("src") !== live) frame.src = live;
+    frame.hidden = !live;
     count.textContent = at + 1 + " / " + slides.length;
     history.replaceState(null, "", "#" + (at + 1));
   }
